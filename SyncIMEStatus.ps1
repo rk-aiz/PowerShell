@@ -1,23 +1,37 @@
-﻿Param(
+﻿<#
+    IMEの有効/無効をウィンドウ間で同期する
+    変換/無変換をIME ON/OFFに置き換える
+    MS-IMEの場合 [IME 入力モード切り替えの通知]を OFFにする事を推奨
+    -> Set-ItemProperty -Path HKCU:\SOFTWARE\Microsoft\IME\15.0\IMEJP\MSIME -Name ShowImeModeNotification -Value 0
+#>
+Param(
     [Parameter()]
-    [Switch] $Disable,
-
+    [switch] $Disable,
     [Parameter()]
-    [Switch] $ShowConsole
+    [switch] $IgnoreZenHan,
+    [Parameter()]
+    [switch] $ShowConsole
 )
 
 $WinEventTypeDef = @'
 using System;
-using System.Text;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 public class WinEvent {
 
-    //IME ON/OFFを切り替えるキーのコード
-    // { [(int)キーコード], [0:IME OFF, 1:IME ON] }
-    private static int[,] IMEStateKeyCode = { {(int)Keys.IMENonconvert, 0}, {(int)Keys.IMEConvert, 1} };
+    // IME ON/OFFを切り替えるキー
+    // { [(int)キーコード], [0:IME OFF, 1:IME ON, 2:IME MODE切り替え], [0:KEYDOWNを通す, 1:KEYDOWNを破棄, 2:KEYDOWN/KEYUPを破棄] }
+    private static int[,] IMEStateKeyCode = {
+        {(int)Keys.IMENonconvert, 0, 1},
+        {(int)Keys.IMEConvert, 1, 1},
+        {243, 2, 1},
+        {244, 2, 1}
+    };
+
+    private static int[] IgnoreKeyCode = { 243, 244 };
+
     private static string[] IMEStateMsg = { "IME OFF", "IME ON" };
 
     [DllImport("user32.dll")]
@@ -52,6 +66,7 @@ public class WinEvent {
     private const uint EVENT_MAX = 0x7FFFFFFF;
     private const int WH_KEYBOARD_LL = 0x000D;
     private const int WM_KEYUP = 0x0101;
+    private const int WM_KEYDOWN = 0x0100;
     private const int WM_IME_CONTROL = 0x0283;
     private const int IMC_GETOPENSTATUS = 0x0005;
     private const int IMC_SETOPENSTATUS = 0x0006;
@@ -106,6 +121,7 @@ public class WinEvent {
     {
         if (eventType == EVENT_SYSTEM_FOREGROUND || 0x70000000 < eventType) {
             IntPtr imeHwnd = ImmGetDefaultIMEWnd(hWnd);
+            //Console.WriteLine(eventType.ToString("X"));
             if (SendMessage(imeHwnd, WM_IME_CONTROL, IMC_GETOPENSTATUS, 0) != stateIme) {
                 SendMessage(imeHwnd, WM_IME_CONTROL, IMC_SETOPENSTATUS, stateIme);
             }
@@ -114,23 +130,33 @@ public class WinEvent {
 
     private static IntPtr KeyEventCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        IntPtr lResult = CallNextHookEx(keyEventHookId, nCode, wParam, lParam);
-        if (nCode >= 0 && wParam == (IntPtr)WM_KEYUP) {
+        if (nCode >= 0 && (wParam == (IntPtr)WM_KEYUP || wParam == (IntPtr)WM_KEYDOWN)) {
             int keyCode = Marshal.ReadInt32(lParam);
+            //Console.WriteLine(keyCode);
             for (int i = 0; i < IMEStateKeyCode.GetLength(0); i++) {
                 if (IMEStateKeyCode[i, 0] == keyCode) {
-                    if (IMEStateKeyCode[i, 1] != stateIme) {
+                    IntPtr hWnd = GetForegroundWindow();
+                    IntPtr imeHwnd = ImmGetDefaultIMEWnd(hWnd);
+                    if (IMEStateKeyCode[i, 2] == 2) {
+                        return (IntPtr)1;
+                    }
+                    if (IMEStateKeyCode[i, 2] == 1 && wParam == (IntPtr)WM_KEYDOWN) {
+                        stateIme = SendMessage(imeHwnd, WM_IME_CONTROL, IMC_GETOPENSTATUS, 0);
+                        return (IntPtr)1;
+                    }
+                    if (IMEStateKeyCode[i, 1] == 2) {
+                        stateIme = (0 == SendMessage(imeHwnd, WM_IME_CONTROL, IMC_GETOPENSTATUS, 0)) ? 1 : 0;
+                        SendMessage(imeHwnd, WM_IME_CONTROL, IMC_SETOPENSTATUS, stateIme);
+                    } else if (IMEStateKeyCode[i, 1] != stateIme) {
                         stateIme = IMEStateKeyCode[i, 1];
-                        Console.WriteLine(IMEStateMsg[stateIme]);
-                        IntPtr hWnd = GetForegroundWindow();
-                        IntPtr imeHwnd = ImmGetDefaultIMEWnd(hWnd);
                         SendMessage(imeHwnd, WM_IME_CONTROL, IMC_SETOPENSTATUS, stateIme);
                     }
+                    Console.WriteLine(IMEStateMsg[stateIme]);
                     break;
                 }
             }
         }
-        return lResult;
+        return CallNextHookEx(keyEventHookId, nCode, wParam, lParam);
     }
 
     public static int ChageImeOpenStatus()
@@ -145,31 +171,56 @@ public class WinEvent {
         }
         return stateIme;
     }
+
+    public static void SetIMEStateKeyCode(int keyCode, int? changeMode, int? ignoreMode)
+    {
+        for (int i = 0; i < IMEStateKeyCode.GetLength(0); i++) {
+            if (IMEStateKeyCode[i, 0] == keyCode) {
+                if (null != changeMode) {
+                    IMEStateKeyCode[i, 1] = changeMode ?? IMEStateKeyCode[i, 1];
+                }
+                if (null != ignoreMode) {
+                    IMEStateKeyCode[i, 2] = ignoreMode ?? IMEStateKeyCode[i, 2];
+                }
+            }
+        }
+    }
 }
 '@
 
-function Sample {
+function Program {
+    Param(
+        [Parameter(Mandatory = $true)]
+        [string] $WinEventTypeDef,
+        [Parameter(Mandatory = $true)]
+        [string] $MyCommandName,
+        [Parameter()]
+        [bool] $Disable = $false,
+        [Parameter()]
+        [bool] $IgnoreZenHan = $false
+    )
     Add-Type -AssemblyName System.Windows.Forms
     Add-Type -AssemblyName PresentationCore
 
     Try {
         [void][WinEvent]
     } Catch {
-        Add-Type -TypeDefinition $Args[0] -ReferencedAssemblies System.Windows.Forms, System.Runtime
+        Add-Type -TypeDefinition $WinEventTypeDef -ReferencedAssemblies System.Windows.Forms, System.Runtime
     }
 
     $appContext = New-Object Windows.Forms.ApplicationContext
 
     $taskTrayIcon = New-Object Windows.Forms.NotifyIcon
     $taskTrayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon((PS -Id $pid).Path)
-    $taskTrayIcon.Text = $Args[1].Name
+    $taskTrayIcon.Text = $MyCommandName
     $taskTrayIcon.Visible = $True
 
-    $menuItemExit = New-Object Windows.Forms.ToolStripMenuItem('Exit')
     $menuItemEnable = New-Object Windows.Forms.ToolStripMenuItem('有効')
+    $menuItemIgnoreZenHan = New-Object Windows.Forms.ToolStripMenuItem('全角/半角 無効')
+    $menuItemExit = New-Object Windows.Forms.ToolStripMenuItem('Exit')
 
     $taskTrayIcon.ContextMenuStrip = New-Object Windows.Forms.ContextMenuStrip
-    $taskTrayIcon.ContextMenuStrip.Items.AddRange(($menuItemEnable, $menuItemExit))
+    $taskTrayIcon.ContextMenuStrip.Items.AddRange(($menuItemEnable, $menuItemIgnoreZenHan, $menuItemExit))
 
     $taskTrayIcon.add_Click({
         if ('Left' -eq $_.Button ) {
@@ -189,8 +240,26 @@ function Sample {
         }
     })
 
-    if ($false -eq $Args[2]) {
+    $menuItemIgnoreZenHan.add_Click({
+        if ($Args[0].Checked) {
+            [WinEvent]::SetIMEStateKeyCode(243, $null, 1)
+            [WinEvent]::SetIMEStateKeyCode(244, $null, 1)
+            $Args[0].Checked = $false
+        } else {
+            [WinEvent]::SetIMEStateKeyCode(243, $null, 2)
+            [WinEvent]::SetIMEStateKeyCode(244, $null, 2)
+            $Args[0].Checked = $true
+        }
+    })
+
+    if ($false -eq $Disable) {
         $menuItemEnable.Checked = [WinEvent]::BeginHook()
+    }
+
+    if ($true -eq $IgnoreZenHan) {
+        [WinEvent]::SetIMEStateKeyCode(243, $null, 2)
+        [WinEvent]::SetIMEStateKeyCode(244, $null, 2)
+        $menuItemIgnoreZenHan.Checked = $true
     }
 
     [Windows.Forms.Application]::Run($appContext)
@@ -204,7 +273,7 @@ if ($ShowConsole) {
     #コンソールありで実行
     $mutexObj = New-Object Threading.Mutex($false, ('Global\{0}' -f $MyInvocation.MyCommand.Name))
     if ($mutexObj.WaitOne(0, $false)) {
-        Sample $WinEventTypeDef $MyInvocation.MyCommand $Disable
+        Program -WinEventTypeDef $WinEventTypeDef -MyCommandName $MyInvocation.MyCommand.Name -Disable $Disable -IgnoreZenHan $IgnoreZenHan
         $mutexObj.ReleaseMutex()
     }
     $mutexObj.Close()
@@ -212,11 +281,13 @@ if ($ShowConsole) {
 } else {
     #コンソールなしで実行
     #(実際には自身のps1をウィンドウ無しで再実行する)
+    $strDisable = $(if ($Disable) {'-Disable '} else {''})
+    $strIgnoreZenHan = $(if ($IgnoreZenHan) {'-IgnoreZenHan '} else {''})
     $StartInfo = New-Object System.Diagnostics.ProcessStartInfo
     $StartInfo.UseShellExecute = $false
     $StartInfo.CreateNoWindow = $true
     $StartInfo.FileName = "powershell.exe"
-    $StartInfo.Arguments = '-ExecutionPolicy Unrestricted -File "{0}" -ShowConsole' -f $MyInvocation.MyCommand.Path
+    $StartInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Unrestricted -File "{0}" -ShowConsole {1}{2}' -f $MyInvocation.MyCommand.Path, $strDisable, $strIgnoreZenHan
     $Process = New-Object System.Diagnostics.Process
     $Process.StartInfo = $StartInfo
     $null = $Process.Start()
