@@ -1,5 +1,8 @@
 ﻿Param(
     [Parameter()]
+    [Switch] $Disable,
+
+    [Parameter()]
     [Switch] $ShowConsole
 )
 
@@ -84,7 +87,7 @@ public class WinEvent {
         }
     }
 
-    public static void EndHook()
+    public static bool EndHook()
     {
         if (IntPtr.Zero != winEventHookId) {
             UnhookWinEvent(winEventHookId);
@@ -94,6 +97,7 @@ public class WinEvent {
             UnhookWindowsHookEx(keyEventHookId);
             keyEventHookId = IntPtr.Zero;
         }
+        return (IntPtr.Zero == keyEventHookId && IntPtr.Zero == winEventHookId) ? false : true;
     }
 
     private static void WinEventCallback(IntPtr hWinEventHook, uint eventType, IntPtr hWnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
@@ -126,11 +130,25 @@ public class WinEvent {
         }
         return lResult;
     }
+
+    public static int ChageImeOpenStatus()
+    {
+        int stateIme_ = (stateIme == 0)? 1: 0;
+        IntPtr hWnd = GetForegroundWindow();
+        IntPtr imeHwnd = ImmGetDefaultIMEWnd(hWnd);
+        int result = SendMessage(imeHwnd, WM_IME_CONTROL, IMC_SETOPENSTATUS, stateIme_);
+        if (0 == result) {
+            stateIme = stateIme_;
+            Console.WriteLine(IMEStateMsg[stateIme]);
+        }
+        return stateIme;
+    }
 }
 '@
 
 $Script = {
     Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName PresentationCore
 
     Try {
         [void][WinEvent]
@@ -141,25 +159,40 @@ $Script = {
     $appContext = New-Object Windows.Forms.ApplicationContext
 
     $taskTrayIcon = New-Object Windows.Forms.NotifyIcon
-    $taskTrayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon((PS -id $PID).Path)
+    $taskTrayIcon.Icon = [Drawing.Icon]::ExtractAssociatedIcon((PS -Id $pid).Path)
+    $taskTrayIcon.Tag = 0
     $taskTrayIcon.Text = $Args[1].Name
     $taskTrayIcon.Visible = $True
 
     $menuItemExit = New-Object Windows.Forms.MenuItem
     $menuItemExit.Text = 'Exit'
 
-    $taskTrayIcon.ContextMenu = New-Object Windows.Forms.ContextMenu
-    $taskTrayIcon.ContextMenu.MenuItems.Add($menuItemExit)
+    $menuItemEnable = New-Object Windows.Forms.MenuItem
+    $menuItemEnable.Text = '有効'
+    $menuItemEnable.Checked = $true
 
+    $taskTrayIcon.ContextMenu = New-Object Windows.Forms.ContextMenu
+    $taskTrayIcon.ContextMenu.MenuItems.AddRange(($menuItemEnable, $menuItemExit))
+
+    $taskTrayIcon.add_Click({
+        $null = [WinEvent]::ChageImeOpenStatus()
+    })
     $menuItemExit.add_Click({
         [Windows.Forms.Application]::ExitThread()
     })
+    $menuItemEnable.add_Click({
+        if ($Args[0].Checked) {
+            $Args[0].Checked = [WinEvent]::EndHook()
+        } else {
+            $Args[0].Checked = [WinEvent]::BeginHook()
+        }
+    })
 
-    if ([WinEvent]::BeginHook()) {
-        [Windows.Forms.Application]::Run($appContext)
-    }
+    $menuItemEnable.Checked = [WinEvent]::BeginHook()
 
-    [WinEvent]::EndHook()
+    [Windows.Forms.Application]::Run($appContext)
+
+    $null = [WinEvent]::EndHook()
 
     $taskTrayIcon.Visible = $false
 }
@@ -168,7 +201,7 @@ if ($ShowConsole) {
     #コンソールありで実行
     $mutexObj = New-Object Threading.Mutex($false, ('Global\{0}' -f $MyInvocation.MyCommand.Name))
     if ($mutexObj.WaitOne(0, $false)) {
-        $Script.Invoke($WinEventTypeDef, $MyInvocation.MyCommand)
+        $Script.Invoke($WinEventTypeDef, $MyInvocation.MyCommand, $Disable)
         $mutexObj.ReleaseMutex()
     }
     $mutexObj.Close()
