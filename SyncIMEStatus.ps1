@@ -30,8 +30,6 @@ public class WinEvent {
         {244, 2, 1}
     };
 
-    private static int[] IgnoreKeyCode = { 243, 244 };
-
     private static string[] IMEStateMsg = { "IME OFF", "IME ON" };
 
     [DllImport("user32.dll")]
