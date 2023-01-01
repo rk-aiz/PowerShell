@@ -199,13 +199,11 @@ function Program {
         [Parameter()]
         [bool] $IgnoreZenHan = $false
     )
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName PresentationCore
 
     Try {
         [void][WinEvent]
     } Catch {
-        Add-Type -TypeDefinition $WinEventTypeDef -ReferencedAssemblies System.Windows.Forms, System.Runtime
+        Add-Type -TypeDefinition $WinEventTypeDef -ReferencedAssemblies System.Windows.Forms
     }
 
     $appContext = New-Object Windows.Forms.ApplicationContext
@@ -283,12 +281,12 @@ if ($ShowConsole) {
     #(実際には自身のps1をウィンドウ無しで再実行する)
     $strDisable = $(if ($Disable) {'-Disable '} else {''})
     $strIgnoreZenHan = $(if ($IgnoreZenHan) {'-IgnoreZenHan '} else {''})
-    $StartInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $StartInfo = New-Object Diagnostics.ProcessStartInfo
     $StartInfo.UseShellExecute = $false
     $StartInfo.CreateNoWindow = $true
     $StartInfo.FileName = "powershell.exe"
     $StartInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Unrestricted -File "{0}" -ShowConsole {1}{2}' -f $MyInvocation.MyCommand.Path, $strDisable, $strIgnoreZenHan
-    $Process = New-Object System.Diagnostics.Process
+    $Process = New-Object Diagnostics.Process
     $Process.StartInfo = $StartInfo
     $null = $Process.Start()
 }
