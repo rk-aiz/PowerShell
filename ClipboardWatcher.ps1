@@ -37,7 +37,6 @@ using System.Windows.Media;
 using System.Windows.Threading;
 public class MainWindow : System.Windows.Window
 {
-    //public extern int Windows.Application.Run(System.Windows.Window window);
     private MainStackPanel _stackPanel = new MainStackPanel();
     private Rect _workArea = System.Windows.SystemParameters.WorkArea;
     private int windowMargin = 25;
@@ -45,7 +44,6 @@ public class MainWindow : System.Windows.Window
 
     public MainWindow()
     {
-        //InitializeComponent();
         AllowsTransparency = true;
         WindowStyle = WindowStyle.None;
         Background = Brushes.Transparent;
@@ -75,6 +73,11 @@ public class MainWindow : System.Windows.Window
     public void AddTextPanel (string text)
     {
         _stackPanel.Children.Add(new TextPanel(text){Margin = new Thickness(panelMargin)});
+    }
+
+    public void AddImagePanel (System.Windows.Media.Imaging.BitmapSource bmpSource)
+    {
+        _stackPanel.Children.Add(new ImagePanel(bmpSource){Margin = new Thickness(panelMargin)});
     }
 
     private void SetWindowLocation()
@@ -107,14 +110,19 @@ class MainStackPanel : StackPanel
     }
 }
 
-class TextPanel : Grid
+abstract class CustomPanel : Grid
 {
-    private static Color ForegroundColor = new Color {A = 255, R = 245, G = 245, B = 245};
-    private static Brush ForegroundBrush = new SolidColorBrush(ForegroundColor);
+    protected static Color ForegroundColor = new Color {A = 255, R = 245, G = 245, B = 245};
+    protected static Brush ForegroundBrush = new SolidColorBrush(ForegroundColor);
 
-    private static Color MouseOverBackgroundColor = new Color {A = 255, R = 80, G = 80, B = 80};
-    private static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
-    public TextPanel(string text)
+    protected static Color MouseOverBackgroundColor = new Color {A = 255, R = 80, G = 80, B = 80};
+    protected static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
+
+    protected static FontFamily IconFont = new FontFamily("Segoe MDL2 Assets");
+
+    protected string IconText = "\uE723";
+
+    public CustomPanel()
     {
         this.Background = new SolidColorBrush(Color.FromRgb(40, 40, 40));
         this.Effect = new System.Windows.Media.Effects.DropShadowEffect
@@ -129,21 +137,24 @@ class TextPanel : Grid
         this.ColumnDefinitions.Add(new ColumnDefinition{MinWidth = 35.0, Width = GridLength.Auto});
         this.ColumnDefinitions.Add(new ColumnDefinition{Width = new GridLength(1.0, GridUnitType.Star)});
         this.ColumnDefinitions.Add(new ColumnDefinition{MinWidth = 35.0, Width = GridLength.Auto});
-        TextBox textContent = new TextBox{
-            Text = text,
-            IsReadOnly = true,
-            BorderThickness = new Thickness((double)0),
-            Background = Brushes.Transparent,
+    }
+
+    protected void InitializeChildren()
+    {
+        TextBlock textIcon = new TextBlock {
+            FontFamily = IconFont,
+            Text = IconText,
+            FontSize = 20.0,
             Foreground = ForegroundBrush,
-            TextAlignment = TextAlignment.Left,
-            FontSize = 18.0
+            Margin = new Thickness(5.0)
         };
-        SetColumn(textContent, 1);
+        SetColumn(textIcon, 0);
         Button closeButton = new Button{
             Style = CloseButtonStyle()
         };
         SetColumn(closeButton, 2);
-        this.Children.Add(textContent);
+
+        this.Children.Add(textIcon);
         this.Children.Add(closeButton);
 
         this.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(CloseButton_Click));
@@ -193,6 +204,46 @@ class TextPanel : Grid
         style.Setters.Add(new Setter(Button.TemplateProperty, ct));
         style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(2.5)));
         return style;
+    }
+}
+
+class TextPanel : CustomPanel
+{
+    public TextPanel(string text)
+    {
+        this.IconText = "\uF0E3";
+        InitializeChildren();
+
+        TextBox textContent = new TextBox{
+            Text = text,
+            IsReadOnly = true,
+            BorderThickness = new Thickness(0.0),
+            Background = Brushes.Transparent,
+            Foreground = ForegroundBrush,
+            TextAlignment = TextAlignment.Left,
+            FontSize = 18.0,
+            Margin = new Thickness(5.0)
+        };
+        SetColumn(textContent, 1);
+        this.Children.Add(textContent);
+    }
+}
+
+class ImagePanel : CustomPanel
+{
+    public ImagePanel (System.Windows.Media.Imaging.BitmapSource bmpSource)
+    {
+        this.IconText = "\uEB9F";
+        InitializeChildren();
+
+        Image imageContent = new Image{
+            Source = bmpSource,
+            Margin = new Thickness(5.0),
+            StretchDirection = StretchDirection.DownOnly,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        SetColumn(imageContent, 1);
+        this.Children.Add(imageContent);
     }
 }
 '@ -ReferencedAssemblies WindowsBase, System.Xaml, PresentationFramework, PresentationCore -ErrorAction Stop
@@ -324,6 +375,11 @@ function Program
         {
             $text = [Clipboard]::GetText()
             $MainWindow.AddTextPanel($text)
+        }
+        elseif ([Clipboard]::ContainsImage())
+        {
+            $bmgSource = [Clipboard]::GetImage()
+            $MainWindow.AddImagePanel($bmgSource)
         }
     })
 
