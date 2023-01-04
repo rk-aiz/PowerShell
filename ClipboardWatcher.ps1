@@ -9,7 +9,8 @@ Param(
     [switch] $ShowConsole
 )
 
-if ($ShowConsole -eq $false) {
+if ($ShowConsole -eq $false)
+{
     #自身のps1をウィンドウ無しで再実行する
     $strDisable = $(if ($Disable) {'-Disable '} else {''})
     $StartInfo = New-Object Diagnostics.ProcessStartInfo
@@ -40,7 +41,7 @@ public class MainWindow : System.Windows.Window
     private MainStackPanel _stackPanel = new MainStackPanel();
     private Rect _workArea = System.Windows.SystemParameters.WorkArea;
     private int windowMargin = 25;
-    private int panelMargin = 15;
+    private double panelMargin = 15.0;
 
     public MainWindow()
     {
@@ -73,26 +74,23 @@ public class MainWindow : System.Windows.Window
 
     public void AddTextPanel (string text)
     {
-        _stackPanel.Children.Add(new TextPanel(text){Margin = new Thickness((double)panelMargin)});
+        _stackPanel.Children.Add(new TextPanel(text){Margin = new Thickness(panelMargin)});
     }
 
     private void SetWindowLocation()
     {
         if (0 < _workArea.Left)
         {
-            //  タスクバーは左
             this.Left = _workArea.Left + windowMargin;
             this.Top = _workArea.Bottom - this.ActualHeight - windowMargin;
         }
         else if (0 < _workArea.Top)
         {
-            //  タスクバーは上
             this.Left = _workArea.Right - this.ActualWidth - windowMargin;
             this.Top = _workArea.Top + windowMargin;
         }
         else
         {
-            //  タスクバーは右か下
             this.Left = _workArea.Right - this.ActualWidth - windowMargin;
             this.Top = _workArea.Bottom - this.ActualHeight - windowMargin;
         }
@@ -111,6 +109,11 @@ class MainStackPanel : StackPanel
 
 class TextPanel : Grid
 {
+    private static Color ForegroundColor = new Color {A = 255, R = 245, G = 245, B = 245};
+    private static Brush ForegroundBrush = new SolidColorBrush(ForegroundColor);
+
+    private static Color MouseOverBackgroundColor = new Color {A = 255, R = 80, G = 80, B = 80};
+    private static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
     public TextPanel(string text)
     {
         this.Background = new SolidColorBrush(Color.FromRgb(40, 40, 40));
@@ -119,11 +122,10 @@ class TextPanel : Grid
             Color = Colors.Black,
             BlurRadius = 15.0,
             ShadowDepth = 0,
-            Opacity = 0.75
+            Opacity = 0.65
         };
-        this.RowDefinitions.Add(new RowDefinition());
-        this.RowDefinitions.Add(new RowDefinition());
-
+        this.RowDefinitions.Add(new RowDefinition{MinHeight = 35.0});
+        this.RowDefinitions.Add(new RowDefinition{MinHeight = 35.0});
         this.ColumnDefinitions.Add(new ColumnDefinition{MinWidth = 35.0, Width = GridLength.Auto});
         this.ColumnDefinitions.Add(new ColumnDefinition{Width = new GridLength(1.0, GridUnitType.Star)});
         this.ColumnDefinitions.Add(new ColumnDefinition{MinWidth = 35.0, Width = GridLength.Auto});
@@ -132,12 +134,65 @@ class TextPanel : Grid
             IsReadOnly = true,
             BorderThickness = new Thickness((double)0),
             Background = Brushes.Transparent,
-            Foreground = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+            Foreground = ForegroundBrush,
             TextAlignment = TextAlignment.Left,
             FontSize = 18.0
         };
         SetColumn(textContent, 1);
+        Button closeButton = new Button{
+            Style = CloseButtonStyle()
+        };
+        SetColumn(closeButton, 2);
         this.Children.Add(textContent);
+        this.Children.Add(closeButton);
+
+        this.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(CloseButton_Click));
+    }
+
+    private void CloseButton_Click (object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ((StackPanel)this.VisualParent).Children.Remove(this);
+        }
+        catch { }
+    }
+
+    private Style CloseButtonStyle()
+    {
+        FrameworkElementFactory tb = new FrameworkElementFactory(typeof(TextBlock));
+        tb.SetValue(TextBlock.WidthProperty, 15.0);
+        tb.SetValue(TextBlock.HeightProperty, 15.0);
+        tb.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
+        tb.SetValue(TextBlock.FontWeightProperty, FontWeights.UltraBold);
+        tb.SetValue(TextBlock.ForegroundProperty, ForegroundBrush);
+        tb.SetValue(TextBlock.FontFamilyProperty, new FontFamily("Segoe MDL2 Assets"));
+        tb.SetValue(TextBlock.TextProperty, "\uE10A");
+
+        FrameworkElementFactory factory = new FrameworkElementFactory(typeof(Border));
+        factory.Name = "border";
+        factory.SetValue(Border.WidthProperty, 30.0);
+        factory.SetValue(Border.HeightProperty, 30.0);
+        factory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
+        factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(15.0));
+        factory.AppendChild(tb);
+        ControlTemplate ct = new ControlTemplate(typeof(Button));
+        ct.VisualTree = factory;
+
+        Trigger mouseOverTrigger = new Trigger();
+        mouseOverTrigger.Property = Button.IsMouseOverProperty;
+        mouseOverTrigger.Value = true;
+        mouseOverTrigger.Setters.Add(new Setter{
+            TargetName = "border",
+            Property = Border.BackgroundProperty,
+            Value = MouseOverBackgroundBrush
+        });
+
+        ct.Triggers.Add(mouseOverTrigger);
+        Style style = new Style(typeof(Button));
+        style.Setters.Add(new Setter(Button.TemplateProperty, ct));
+        style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(2.5)));
+        return style;
     }
 }
 '@ -ReferencedAssemblies WindowsBase, System.Xaml, PresentationFramework, PresentationCore -ErrorAction Stop
@@ -165,6 +220,9 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
     private const int WM_DRAWCLIPBOARD = 0x031D;
     private bool listenState = false;
     public NotifyIcon _notifyIcon;
+    public NotifyIcon NotifyIcon{
+        get { return _notifyIcon; }
+    }
 
     public event EventHandler ClipboardChanged;
 
