@@ -12,3 +12,6 @@ PowerShell練習用に作ったツール
     
     現状EVENT_SYSTEM_FOREGROUND をフックして SendMessageでIME ON/OFF切り替えをするという微妙な実装
     もっといい方法がないものか・・・
+
+・ClipboardWatcher.ps1
+    - クリップボードに変更があった場合にスクリプトを実行するサンプル
