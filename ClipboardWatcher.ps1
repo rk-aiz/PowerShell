@@ -31,13 +31,18 @@ Try {
 } Catch {
 Add-Type -TypeDefinition @'
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media.Imaging;
 using System.Diagnostics;
+using System.Configuration;
+using Microsoft.Win32;
+
 public class MainWindow : System.Windows.Window
 {
     private MainStackPanel _stackPanel = new MainStackPanel();
@@ -82,7 +87,7 @@ public class MainWindow : System.Windows.Window
         _stackPanel.Children.Add(new HyperlinkPanel(text));
     }
 
-    public void AddImagePanel (System.Windows.Media.Imaging.BitmapSource bmpSource)
+    public void AddImagePanel (BitmapSource bmpSource)
     {
         _stackPanel.Children.Add(new ImagePanel(bmpSource));
     }
@@ -124,10 +129,10 @@ abstract class CustomPanel : Grid, IDisposable
     protected static Color MouseOverBackgroundColor = new Color {A = 255, R = 70, G = 70, B = 70};
     protected static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
 
-    protected static Color ButtonBackgroundColor = new Color {A = 255, R = 75, G = 75, B = 75};
+    protected static Color ButtonBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
     protected static Brush ButtonBackgroundBrush = new SolidColorBrush(ButtonBackgroundColor);
 
-    protected static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 50, G = 145, B = 225};
+    protected static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 75, G = 75, B = 75};
     protected static Brush ButtonMouseOverBackgroundBrush = new SolidColorBrush(ButtonMouseOverBackgroundColor);
 
     protected static FontFamily IconFont = new FontFamily("Segoe MDL2 Assets");
@@ -137,10 +142,15 @@ abstract class CustomPanel : Grid, IDisposable
     protected Button closeButton;
     protected Button copyButton;
 
+    protected StackPanel _buttonStack;
+
+    protected abstract void CopyButton_Click (object sender, RoutedEventArgs e);
+
     public CustomPanel()
     {
-        this.Margin = new Thickness(10.0);
-        this.Background = new SolidColorBrush(Color.FromRgb(40, 40, 40));
+        this.HorizontalAlignment = HorizontalAlignment.Stretch;
+        this.Margin = new Thickness{Top = 15.0};
+        this.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
         this.Effect = new System.Windows.Media.Effects.DropShadowEffect
         {
             Color = Colors.Black,
@@ -172,20 +182,20 @@ abstract class CustomPanel : Grid, IDisposable
         SetColumn(closeButton, 2);
 
         this.copyButton = new Button{
-            Style = CopyButtonStyle()
+            Style = ActionButtonStyle("Copy")
         };
-        SetColumn(this.copyButton, 2);
+        this.copyButton.Click += new RoutedEventHandler(CopyButton_Click);
 
-        StackPanel buttonStack = new StackPanel{
+        this._buttonStack = new StackPanel{
             Orientation = Orientation.Horizontal,
             FlowDirection = FlowDirection.RightToLeft
         };
-        SetRow(buttonStack, 1);
-        SetColumnSpan(buttonStack, 3);
-        buttonStack.Children.Add(this.copyButton);
+        SetRow(this._buttonStack, 1);
+        SetColumnSpan(this._buttonStack, 3);
+        this._buttonStack.Children.Add(this.copyButton);
         this.Children.Add(textIcon);
         this.Children.Add(this.closeButton);
-        this.Children.Add(buttonStack);
+        this.Children.Add(this._buttonStack);
     }
 
     private void CloseButton_Click (object sender, RoutedEventArgs e)
@@ -207,10 +217,10 @@ abstract class CustomPanel : Grid, IDisposable
 
         FrameworkElementFactory factory = new FrameworkElementFactory(typeof(Border));
         factory.Name = "border";
-        factory.SetValue(Border.WidthProperty, 30.0);
-        factory.SetValue(Border.HeightProperty, 30.0);
+        factory.SetValue(Border.WidthProperty, 25.0);
+        factory.SetValue(Border.HeightProperty, 25.0);
         factory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
-        factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(15.0));
+        factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
         factory.AppendChild(tb);
         ControlTemplate ct = new ControlTemplate(typeof(Button));
         ct.VisualTree = factory;
@@ -227,18 +237,18 @@ abstract class CustomPanel : Grid, IDisposable
         ct.Triggers.Add(mouseOverTrigger);
         Style style = new Style(typeof(Button));
         style.Setters.Add(new Setter(Button.TemplateProperty, ct));
-        style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(2.5)));
+        style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(7.5)));
         return style;
     }
 
-    private Style CopyButtonStyle()
+    protected Style ActionButtonStyle(string caption)
     {
         FrameworkElementFactory tb = new FrameworkElementFactory(typeof(TextBlock));
-        tb.SetValue(TextBlock.PaddingProperty, new Thickness(10.0, 2.5, 10.0, 2.5));
-        tb.SetValue(TextBlock.FontSizeProperty, 16.0);
+        tb.SetValue(TextBlock.PaddingProperty, new Thickness(15.0, 5.0, 15.0, 5.0));
+        tb.SetValue(TextBlock.FontSizeProperty, 14.0);
         tb.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
         tb.SetValue(TextBlock.ForegroundProperty, ForegroundBrush);
-        tb.SetValue(TextBlock.TextProperty, "Copy");
+        tb.SetValue(TextBlock.TextProperty, caption);
 
         FrameworkElementFactory factory = new FrameworkElementFactory(typeof(Border));
         factory.Name = "border";
@@ -249,9 +259,15 @@ abstract class CustomPanel : Grid, IDisposable
         ControlTemplate ct = new ControlTemplate(typeof(Button));
         ct.VisualTree = factory;
 
-        Trigger mouseOverTrigger = new Trigger();
-        mouseOverTrigger.Property = Button.IsMouseOverProperty;
-        mouseOverTrigger.Value = true;
+        MultiTrigger mouseOverTrigger = new MultiTrigger();
+        mouseOverTrigger.Conditions.Add(new Condition{
+            Property = Border.IsMouseOverProperty,
+            Value = true
+        });
+        mouseOverTrigger.Conditions.Add(new Condition{
+            Property = Border.IsMouseCapturedProperty,
+            Value = false
+        });
         mouseOverTrigger.Setters.Add(new Setter{
             TargetName = "border",
             Property = Border.BackgroundProperty,
@@ -261,8 +277,24 @@ abstract class CustomPanel : Grid, IDisposable
         ct.Triggers.Add(mouseOverTrigger);
         Style style = new Style(typeof(Button));
         style.Setters.Add(new Setter(Button.TemplateProperty, ct));
-        style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(5.0, 0.0, 0.0, 5.0)));
+        style.Setters.Add(new Setter(Button.MarginProperty, new Thickness{Left = 15.0, Bottom = 15.0})); //FlowDirection.RightToLeftの為 Leftマージンを設定
         return style;
+    }
+
+    protected Window GetWindowObject ()
+    {
+        try{
+            DependencyObject dpObj = this;
+            while (null != dpObj) {
+                dpObj = VisualTreeHelper.GetParent(dpObj);
+                if (typeof(Window) == dpObj.DependencyObjectType.SystemType) {
+                    return (Window)dpObj;
+                }
+            }
+            return null;
+        } catch {
+            return null;
+        }
     }
 
     public void Dispose()
@@ -281,7 +313,6 @@ class TextPanel : CustomPanel
     public TextPanel(string text)
     {
         _text = text;
-        this.Margin = new Thickness(15.0);
         this.IconText = "\uF000";
         InitializeChildren();
 
@@ -298,17 +329,15 @@ class TextPanel : CustomPanel
         };
         SetColumn(textContent, 1);
         this.Children.Add(textContent);
-
-        this.copyButton.Click += new RoutedEventHandler(CopyButton_Click);
     }
 
-    private void CopyButton_Click (object sender, RoutedEventArgs e)
+    protected override void CopyButton_Click (object sender, RoutedEventArgs e)
     {
         try {
             DataObject dataObj = new DataObject();
             dataObj.SetText(this._text);
             Clipboard.SetDataObject(dataObj);
-            Dispose();
+            this.Dispose();
 
         } catch { }
     }
@@ -343,8 +372,6 @@ class HyperlinkPanel : CustomPanel
         };
         SetColumn(outerTextBlock, 1);
         this.Children.Add(outerTextBlock);
-
-        this.copyButton.Click += new RoutedEventHandler(CopyButton_Click);
     }
 
     private void RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
@@ -370,13 +397,13 @@ class HyperlinkPanel : CustomPanel
         } catch { }
     }
 
-    private void CopyButton_Click (object sender, RoutedEventArgs e)
+    protected override void CopyButton_Click (object sender, RoutedEventArgs e)
     {
         try {
             DataObject dataObj = new DataObject();
             dataObj.SetText(this._urlString);
             Clipboard.SetDataObject(dataObj);
-            Dispose();
+            this.Dispose();
 
         } catch { }
     }
@@ -384,8 +411,10 @@ class HyperlinkPanel : CustomPanel
 
 class ImagePanel : CustomPanel
 {
-    public ImagePanel (System.Windows.Media.Imaging.BitmapSource bmpSource)
+    private BitmapSource _bmpSource;
+    public ImagePanel (BitmapSource bmpSource)
     {
+        this._bmpSource = bmpSource;
         this.IconText = "\uEB9F";
         InitializeChildren();
 
@@ -397,10 +426,49 @@ class ImagePanel : CustomPanel
         };
         SetColumn(imageContent, 1);
         this.Children.Add(imageContent);
+
+        Button saveButton = new Button{
+            Style = ActionButtonStyle("Save")
+        };
+        saveButton.Click += new RoutedEventHandler(SaveButton_Click);
+        this._buttonStack.Children.Add(saveButton);
+    }
+
+    protected override void CopyButton_Click (object sender, RoutedEventArgs e)
+    {
+        try {
+            DataObject dataObj = new DataObject();
+            dataObj.SetImage(this._bmpSource);
+            Clipboard.SetDataObject(dataObj);
+            this.Dispose();
+        } catch { }
+    }
+
+    protected void SaveButton_Click (object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog();
+        dialog.Filter = "PNG(*.png)|*.png|全てのファイル(*.*)|*.*";
+        dialog.InitialDirectory = AppSettings.SaveImageFolder;
+        var result = dialog.ShowDialog(this.GetWindowObject());
+        
+        if (true != result)
+            return;
+        
+        using (var fileStream = new FileStream(dialog.FileName, FileMode.Create))
+        {
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(this._bmpSource));
+            encoder.Save(fileStream);
+        }
     }
 }
 
-'@ -ReferencedAssemblies WindowsBase, System.Xaml, PresentationFramework, PresentationCore -ErrorAction Stop
+public class AppSettings
+{
+    public static string SaveImageFolder = ConfigurationManager.AppSettings["SaveImageFolder"] ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+}
+
+'@ -ReferencedAssemblies WindowsBase, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
 }
 #endregion
 
@@ -527,11 +595,7 @@ function Program
     {
         Param($s, $e)
         #$Host.UI.WriteDebugLine("[ClipboardWatcher]ClipboardChanged")
-        if ([Clipboard]::GetData("ClipboardWathcerData"))
-        {
-            return
-        }
-        elseif ([Clipboard]::ContainsText())
+        if ([Clipboard]::ContainsText())
         {
             $text = [Clipboard]::GetText()
             if ($UrlRegEx.IsMatch($text)) {
