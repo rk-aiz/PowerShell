@@ -40,7 +40,6 @@ public class MainWindow : System.Windows.Window
     private MainStackPanel _stackPanel = new MainStackPanel();
     private Rect _workArea = System.Windows.SystemParameters.WorkArea;
     private int windowMargin = 25;
-    private double panelMargin = 15.0;
 
     public MainWindow()
     {
@@ -72,12 +71,17 @@ public class MainWindow : System.Windows.Window
 
     public void AddTextPanel (string text)
     {
-        _stackPanel.Children.Add(new TextPanel(text){Margin = new Thickness(panelMargin)});
+        _stackPanel.Children.Add(new TextPanel(text));
+    }
+
+    public void AddHyperlinkPanel (string text)
+    {
+        _stackPanel.Children.Add(new HyperlinkPanel(text));
     }
 
     public void AddImagePanel (System.Windows.Media.Imaging.BitmapSource bmpSource)
     {
-        _stackPanel.Children.Add(new ImagePanel(bmpSource){Margin = new Thickness(panelMargin)});
+        _stackPanel.Children.Add(new ImagePanel(bmpSource));
     }
 
     private void SetWindowLocation()
@@ -120,10 +124,11 @@ abstract class CustomPanel : Grid
 
     protected static FontFamily IconFont = new FontFamily("Segoe MDL2 Assets");
 
-    protected string IconText = "\uE723";
+    protected string IconText = "\uF0E3";
 
     public CustomPanel()
     {
+        this.Margin = new Thickness(10.0);
         this.Background = new SolidColorBrush(Color.FromRgb(40, 40, 40));
         this.Effect = new System.Windows.Media.Effects.DropShadowEffect
         {
@@ -146,18 +151,19 @@ abstract class CustomPanel : Grid
             Text = IconText,
             FontSize = 20.0,
             Foreground = ForegroundBrush,
-            Margin = new Thickness(5.0)
+            Margin = new Thickness(10.0, 10.0, 5.0, 0.0)
         };
         SetColumn(textIcon, 0);
         Button closeButton = new Button{
             Style = CloseButtonStyle()
         };
+        closeButton.Click += new RoutedEventHandler(CloseButton_Click);
         SetColumn(closeButton, 2);
 
         this.Children.Add(textIcon);
         this.Children.Add(closeButton);
 
-        this.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(CloseButton_Click));
+        //this.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(CloseButton_Click));
     }
 
     private void CloseButton_Click (object sender, RoutedEventArgs e)
@@ -209,12 +215,15 @@ abstract class CustomPanel : Grid
 
 class TextPanel : CustomPanel
 {
+    new protected Thickness Margin = new Thickness(15.0);
+
     public TextPanel(string text)
     {
-        this.IconText = "\uF0E3";
+        this.IconText = "\uF000";
         InitializeChildren();
 
-        TextBox textContent = new TextBox{
+        TextBox textContent = new TextBox
+        {
             Text = text,
             IsReadOnly = true,
             BorderThickness = new Thickness(0.0),
@@ -226,6 +235,49 @@ class TextPanel : CustomPanel
         };
         SetColumn(textContent, 1);
         this.Children.Add(textContent);
+    }
+}
+
+class HyperlinkPanel : CustomPanel
+{
+    public HyperlinkPanel (string urlString)
+    {
+        this.IconText = "\uE167";
+        InitializeChildren();
+
+        System.Windows.Documents.Hyperlink hyperlinkContent = new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run(urlString))
+        {
+            NavigateUri = new Uri(urlString),
+            Foreground = new SolidColorBrush(new Color {A = 255, R = 3, G = 169, B = 245})
+        };
+        hyperlinkContent.RequestNavigate += new System.Windows.Navigation.RequestNavigateEventHandler(RequestNavigate);
+        /*Trigger mouseOverTrigger = new Trigger();
+        mouseOverTrigger.Property = Hyperlink.IsMouseOverProperty;
+        mouseOverTrigger.Value = true;
+        mouseOverTrigger.Setters.Add(new Setter{
+            Property = Hyperlink.ForegroundProperty,
+            Value = MouseOverBackgroundBrush
+        });*/
+
+        TextBlock outerTextBlock = new TextBlock(hyperlinkContent)
+        {
+            Foreground = ForegroundBrush,
+            TextAlignment = TextAlignment.Left,
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 18.0,
+            Margin = new Thickness(5.0),
+        };
+        SetColumn(outerTextBlock, 1);
+        this.Children.Add(outerTextBlock);
+    }
+
+    private void RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    {
+        try {
+            System.Diagnostics.Process.Start( new System.Diagnostics.ProcessStartInfo( e.Uri.AbsoluteUri ) );
+            e.Handled = true;
+        }
+        catch { }
     }
 }
 
@@ -246,6 +298,7 @@ class ImagePanel : CustomPanel
         this.Children.Add(imageContent);
     }
 }
+
 '@ -ReferencedAssemblies WindowsBase, System.Xaml, PresentationFramework, PresentationCore -ErrorAction Stop
 }
 #endregion
@@ -344,6 +397,11 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
 }
 #endregion
 
+$global:UrlRegExStr = @'
+^http(s)?://[-_.!~*'()a-zA-Z0-9;/?:@&=+$,%#]+$
+'@
+
+
 # ============================================================================ #
 # region Program
 function Program
@@ -355,10 +413,9 @@ function Program
         [bool] $Disable = $false
     )
 
+    $UrlRegEx = New-Object RegEx $global:UrlRegExStr
     $appContext = New-Object Windows.Forms.ApplicationContext
-
     $ClipBoardWatcher = New-Object ClipboardWatcher
-
     $MainWindow = New-Object MainWindow
     $MainWindow.Show()
 
@@ -374,7 +431,13 @@ function Program
         if ([Clipboard]::ContainsText())
         {
             $text = [Clipboard]::GetText()
-            $MainWindow.AddTextPanel($text)
+            if ($UrlRegEx.IsMatch($text)) {
+                $MainWindow.AddHyperlinkPanel($text)
+            }
+            else
+            {
+                $MainWindow.AddTextPanel($text)
+            }
         }
         elseif ([Clipboard]::ContainsImage())
         {
@@ -383,7 +446,7 @@ function Program
         }
     })
 
-    $ClipBoardWatcher._notifyIcon.add_MouseDoubleClick(
+    $ClipBoardWatcher.NotifyIcon.add_MouseDoubleClick(
     {
         if ($MainWindow.Visibility -eq 'Visible')
         {
