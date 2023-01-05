@@ -2,11 +2,14 @@
 
 #>
 using namespace System.Windows
+using namespace System.Text
 Param(
     [Parameter()]
     [switch] $Disable,
     [Parameter()]
-    [switch] $ShowConsole
+    [switch] $ShowConsole,
+    [Parameter()]
+    [switch] $UserDebug
 )
 
 if ($ShowConsole -eq $false)
@@ -90,6 +93,11 @@ public class MainWindow : System.Windows.Window
     public void AddImagePanel (BitmapSource bmpSource)
     {
         _stackPanel.Children.Add(new ImagePanel(bmpSource));
+    }
+
+    public void AddImagePanel (BitmapSource bmpSource, string urlString)
+    {
+        _stackPanel.Children.Add(new ImagePanel(bmpSource, urlString));
     }
 
     private void SetWindowLocation()
@@ -412,6 +420,8 @@ class HyperlinkPanel : CustomPanel
 class ImagePanel : CustomPanel
 {
     private BitmapSource _bmpSource;
+    private string _urlString;
+
     public ImagePanel (BitmapSource bmpSource)
     {
         this._bmpSource = bmpSource;
@@ -434,6 +444,11 @@ class ImagePanel : CustomPanel
         this._buttonStack.Children.Add(saveButton);
     }
 
+    public ImagePanel (BitmapSource bmpSource, string urlString) : this(bmpSource)
+    {
+        this._urlString = urlString;
+    }
+
     protected override void CopyButton_Click (object sender, RoutedEventArgs e)
     {
         try {
@@ -446,9 +461,14 @@ class ImagePanel : CustomPanel
 
     protected void SaveButton_Click (object sender, RoutedEventArgs e)
     {
+
         var dialog = new SaveFileDialog();
         dialog.Filter = "PNG(*.png)|*.png|全てのファイル(*.*)|*.*";
         dialog.InitialDirectory = AppSettings.SaveImageFolder;
+
+        if (null != this._urlString)
+            dialog.FileName = Path.Combine(dialog.InitialDirectory , Path.GetFileName(this._urlString));
+
         var result = dialog.ShowDialog(this.GetWindowObject());
         
         if (true != result)
@@ -513,7 +533,6 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
 
     new public void Close ()
     {
-        Console.WriteLine("Form.OnClosing");
         if (null != _notifyIcon) {
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
@@ -532,44 +551,43 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
 
     protected override void WndProc(ref Message m) 
     {
-        // Listen for operating system messages.
         if (m.Msg == WM_DRAWCLIPBOARD)
-        {
             this.OnClipboardChanged();
-        }
+
         base.WndProc(ref m);
     }
 
     public void OnClipboardChanged()
     {
         var cc = this.ClipboardChanged;
-        if (null != cc) {
+        if (null != cc)
             ClipboardChanged.Invoke(this, EventArgs.Empty);
-        }
+
     }
 
     public void Start()
     {
-        if (false == this.listenState) {
+        if (false == this.listenState)
             this.listenState = AddClipboardFormatListener(this.Handle);
-        }
     }
 
     public void Stop()
     {
-        if (true == this.listenState) {
+        if (true == this.listenState)
             this.listenState = RemoveClipboardFormatListener(this.Handle) ? false : true;
-        }
     }
 }
 '@ -ReferencedAssemblies System.Windows.Forms, System.Drawing -ErrorAction Stop
 }
 #endregion
 
+if ($UserDebug) {
+    $DebugPreference = 'Continue'
+}
+
 $global:UrlRegExStr = @'
 ^http(s)?://[-_.!~*'()a-zA-Z0-9;/?:@&=+$,%#]+$
 '@
-
 
 # ============================================================================ #
 # region Program
@@ -594,10 +612,17 @@ function Program
     $ClipBoardWatcher.add_ClipboardChanged(
     {
         Param($s, $e)
-        #$Host.UI.WriteDebugLine("[ClipboardWatcher]ClipboardChanged")
-        if ([Clipboard]::ContainsText())
+
+        $dataObj = [Clipboard]::GetDataObject()
+
+        if ($null -eq $dataObj) {
+            return
+        }
+        Write-Debug ($dataObj.GetFormats() -join ' ')
+
+        if ($dataObj.ContainsText())
         {
-            $text = [Clipboard]::GetText()
+            $text = $dataObj.GetText()
             if ($UrlRegEx.IsMatch($text)) {
                 $MainWindow.AddHyperlinkPanel($text)
             }
@@ -606,10 +631,22 @@ function Program
                 $MainWindow.AddTextPanel($text)
             }
         }
-        elseif ([Clipboard]::ContainsImage())
+        elseif ($dataObj.ContainsImage())
         {
-            $bmgSource = [Clipboard]::GetImage()
-            $MainWindow.AddImagePanel($bmgSource)
+            $memoryStream = [System.IO.MemoryStream]$dataObj.GetData('UniformResourceLocatorW')
+            if ($null -ne $memoryStream) {
+                $buffer = new-object byte[] $memoryStream.Length
+                $count = $memoryStream.Read($buffer, $memoryStream.Position, $memoryStream.Length)
+                $converted = [Encoding]::Convert([Encoding]::Unicode, [Encoding]::UTF8, $buffer)
+                $urlString = [Encoding]::UTF8.GetString($converted).Trim("`0")
+                Write-Debug ("Source URL : $urlString")
+                if ($UrlRegEx.IsMatch($urlString)) {
+                    $MainWindow.AddImagePanel($dataObj.GetImage(), $urlString)
+                    return
+                }
+            }
+
+            $MainWindow.AddImagePanel($dataObj.GetImage())
         }
     })
 
