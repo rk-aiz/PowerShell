@@ -35,6 +35,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Diagnostics;
 public class MainWindow : System.Windows.Window
 {
     private MainStackPanel _stackPanel = new MainStackPanel();
@@ -47,7 +50,7 @@ public class MainWindow : System.Windows.Window
         WindowStyle = WindowStyle.None;
         Background = Brushes.Transparent;
         ShowInTaskbar = false;
-        this.Width = 650;
+        this.Width = 450;
         this.SizeToContent = SizeToContent.Height;
         
         _stackPanel.RenderSizeChanged += MainStackPanel_RenderSizeChanged ;
@@ -114,17 +117,25 @@ class MainStackPanel : StackPanel
     }
 }
 
-abstract class CustomPanel : Grid
+abstract class CustomPanel : Grid, IDisposable
 {
-    protected static Color ForegroundColor = new Color {A = 255, R = 245, G = 245, B = 245};
-    protected static Brush ForegroundBrush = new SolidColorBrush(ForegroundColor);
+    protected static Brush ForegroundBrush = new SolidColorBrush(Colors.WhiteSmoke);
 
-    protected static Color MouseOverBackgroundColor = new Color {A = 255, R = 80, G = 80, B = 80};
+    protected static Color MouseOverBackgroundColor = new Color {A = 255, R = 70, G = 70, B = 70};
     protected static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
+
+    protected static Color ButtonBackgroundColor = new Color {A = 255, R = 75, G = 75, B = 75};
+    protected static Brush ButtonBackgroundBrush = new SolidColorBrush(ButtonBackgroundColor);
+
+    protected static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 50, G = 145, B = 225};
+    protected static Brush ButtonMouseOverBackgroundBrush = new SolidColorBrush(ButtonMouseOverBackgroundColor);
 
     protected static FontFamily IconFont = new FontFamily("Segoe MDL2 Assets");
 
     protected string IconText = "\uF0E3";
+
+    protected Button closeButton;
+    protected Button copyButton;
 
     public CustomPanel()
     {
@@ -154,25 +165,32 @@ abstract class CustomPanel : Grid
             Margin = new Thickness(10.0, 10.0, 5.0, 0.0)
         };
         SetColumn(textIcon, 0);
-        Button closeButton = new Button{
+        this.closeButton = new Button{
             Style = CloseButtonStyle()
         };
-        closeButton.Click += new RoutedEventHandler(CloseButton_Click);
+        this.closeButton.Click += new RoutedEventHandler(CloseButton_Click);
         SetColumn(closeButton, 2);
 
-        this.Children.Add(textIcon);
-        this.Children.Add(closeButton);
+        this.copyButton = new Button{
+            Style = CopyButtonStyle()
+        };
+        SetColumn(this.copyButton, 2);
 
-        //this.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent, new RoutedEventHandler(CloseButton_Click));
+        StackPanel buttonStack = new StackPanel{
+            Orientation = Orientation.Horizontal,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        SetRow(buttonStack, 1);
+        SetColumnSpan(buttonStack, 3);
+        buttonStack.Children.Add(this.copyButton);
+        this.Children.Add(textIcon);
+        this.Children.Add(this.closeButton);
+        this.Children.Add(buttonStack);
     }
 
     private void CloseButton_Click (object sender, RoutedEventArgs e)
     {
-        try
-        {
-            ((StackPanel)this.VisualParent).Children.Remove(this);
-        }
-        catch { }
+        Dispose();
     }
 
     private Style CloseButtonStyle()
@@ -181,6 +199,7 @@ abstract class CustomPanel : Grid
         tb.SetValue(TextBlock.WidthProperty, 15.0);
         tb.SetValue(TextBlock.HeightProperty, 15.0);
         tb.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
+        tb.SetValue(TextBlock.FontSizeProperty, 15.0);
         tb.SetValue(TextBlock.FontWeightProperty, FontWeights.UltraBold);
         tb.SetValue(TextBlock.ForegroundProperty, ForegroundBrush);
         tb.SetValue(TextBlock.FontFamilyProperty, new FontFamily("Segoe MDL2 Assets"));
@@ -211,14 +230,58 @@ abstract class CustomPanel : Grid
         style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(2.5)));
         return style;
     }
+
+    private Style CopyButtonStyle()
+    {
+        FrameworkElementFactory tb = new FrameworkElementFactory(typeof(TextBlock));
+        tb.SetValue(TextBlock.PaddingProperty, new Thickness(10.0, 2.5, 10.0, 2.5));
+        tb.SetValue(TextBlock.FontSizeProperty, 16.0);
+        tb.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
+        tb.SetValue(TextBlock.ForegroundProperty, ForegroundBrush);
+        tb.SetValue(TextBlock.TextProperty, "Copy");
+
+        FrameworkElementFactory factory = new FrameworkElementFactory(typeof(Border));
+        factory.Name = "border";
+        factory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
+        factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
+        factory.SetValue(Border.BackgroundProperty, ButtonBackgroundBrush);
+        factory.AppendChild(tb);
+        ControlTemplate ct = new ControlTemplate(typeof(Button));
+        ct.VisualTree = factory;
+
+        Trigger mouseOverTrigger = new Trigger();
+        mouseOverTrigger.Property = Button.IsMouseOverProperty;
+        mouseOverTrigger.Value = true;
+        mouseOverTrigger.Setters.Add(new Setter{
+            TargetName = "border",
+            Property = Border.BackgroundProperty,
+            Value = ButtonMouseOverBackgroundBrush
+        });
+
+        ct.Triggers.Add(mouseOverTrigger);
+        Style style = new Style(typeof(Button));
+        style.Setters.Add(new Setter(Button.TemplateProperty, ct));
+        style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(5.0, 0.0, 0.0, 5.0)));
+        return style;
+    }
+
+    public void Dispose()
+    {
+        try {
+            this.Children.Clear();
+            ((StackPanel)this.VisualParent).Children.Remove(this);
+        } catch { }
+    }
 }
 
 class TextPanel : CustomPanel
 {
-    new protected Thickness Margin = new Thickness(15.0);
+    private string _text;
 
     public TextPanel(string text)
     {
+        _text = text;
+        this.Margin = new Thickness(15.0);
         this.IconText = "\uF000";
         InitializeChildren();
 
@@ -230,54 +293,92 @@ class TextPanel : CustomPanel
             Background = Brushes.Transparent,
             Foreground = ForegroundBrush,
             TextAlignment = TextAlignment.Left,
-            FontSize = 18.0,
+            FontSize = 17.0,
             Margin = new Thickness(5.0)
         };
         SetColumn(textContent, 1);
         this.Children.Add(textContent);
+
+        this.copyButton.Click += new RoutedEventHandler(CopyButton_Click);
+    }
+
+    private void CopyButton_Click (object sender, RoutedEventArgs e)
+    {
+        try {
+            DataObject dataObj = new DataObject();
+            dataObj.SetText(this._text);
+            Clipboard.SetDataObject(dataObj);
+            Dispose();
+
+        } catch { }
     }
 }
 
 class HyperlinkPanel : CustomPanel
 {
+    private string _urlString;
     public HyperlinkPanel (string urlString)
     {
+        this._urlString = urlString;
         this.IconText = "\uE167";
         InitializeChildren();
 
-        System.Windows.Documents.Hyperlink hyperlinkContent = new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run(urlString))
+        Hyperlink hyperlinkContent = new Hyperlink(new Run(urlString))
         {
             NavigateUri = new Uri(urlString),
-            Foreground = new SolidColorBrush(new Color {A = 255, R = 3, G = 169, B = 245})
+            Foreground = new SolidColorBrush(new Color {A = 255, R = 3, G = 169, B = 245}),
         };
+        hyperlinkContent.TextDecorations = new TextDecorationCollection();
         hyperlinkContent.RequestNavigate += new System.Windows.Navigation.RequestNavigateEventHandler(RequestNavigate);
-        /*Trigger mouseOverTrigger = new Trigger();
-        mouseOverTrigger.Property = Hyperlink.IsMouseOverProperty;
-        mouseOverTrigger.Value = true;
-        mouseOverTrigger.Setters.Add(new Setter{
-            Property = Hyperlink.ForegroundProperty,
-            Value = MouseOverBackgroundBrush
-        });*/
+        hyperlinkContent.MouseEnter += new MouseEventHandler(Hyperlink_MouseEnter);
+        hyperlinkContent.MouseLeave += new MouseEventHandler(Hyperlink_MouseLeave);
 
         TextBlock outerTextBlock = new TextBlock(hyperlinkContent)
         {
             Foreground = ForegroundBrush,
             TextAlignment = TextAlignment.Left,
             TextWrapping = TextWrapping.Wrap,
-            FontSize = 18.0,
+            FontSize = 17.0,
             Margin = new Thickness(5.0),
         };
         SetColumn(outerTextBlock, 1);
         this.Children.Add(outerTextBlock);
+
+        this.copyButton.Click += new RoutedEventHandler(CopyButton_Click);
     }
 
     private void RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
     {
         try {
-            System.Diagnostics.Process.Start( new System.Diagnostics.ProcessStartInfo( e.Uri.AbsoluteUri ) );
+            Process.Start( new ProcessStartInfo( e.Uri.AbsoluteUri ) );
             e.Handled = true;
         }
         catch { }
+    }
+
+    private void Hyperlink_MouseEnter( object sender, MouseEventArgs e )
+    {
+        try {
+            ((Hyperlink)sender).TextDecorations.Add(TextDecorations.Underline);
+        } catch { }
+    }
+
+    private void Hyperlink_MouseLeave( object sender, MouseEventArgs e )
+    {
+        try {
+            ((Hyperlink)sender).TextDecorations.Clear();
+        } catch { }
+    }
+
+    private void CopyButton_Click (object sender, RoutedEventArgs e)
+    {
+        try {
+            DataObject dataObj = new DataObject();
+            dataObj.SetText(this._urlString);
+            Clipboard.SetDataObject(dataObj);
+            Dispose();
+
+        } catch { }
     }
 }
 
@@ -407,8 +508,6 @@ $global:UrlRegExStr = @'
 function Program
 {
     Param(
-        [Parameter(Mandatory = $true)]
-        [string] $NotifyIconText,
         [Parameter()]
         [bool] $Disable = $false
     )
@@ -428,13 +527,17 @@ function Program
     {
         Param($s, $e)
         #$Host.UI.WriteDebugLine("[ClipboardWatcher]ClipboardChanged")
-        if ([Clipboard]::ContainsText())
+        if ([Clipboard]::GetData("ClipboardWathcerData"))
+        {
+            return
+        }
+        elseif ([Clipboard]::ContainsText())
         {
             $text = [Clipboard]::GetText()
             if ($UrlRegEx.IsMatch($text)) {
                 $MainWindow.AddHyperlinkPanel($text)
             }
-            else
+            elseif ($text -notmatch "^\s*$")
             {
                 $MainWindow.AddTextPanel($text)
             }
@@ -468,7 +571,7 @@ function Program
 $mutexObj = New-Object Threading.Mutex($false, ('Global\{0}' -f $MyInvocation.MyCommand.Name))
 
 if ($mutexObj.WaitOne(0, $false)) {
-    Program -NotifyIconText $MyInvocation.MyCommand.Name -Disable $Disable
+    Program -Disable $Disable
     $mutexObj.ReleaseMutex()
 }
 
