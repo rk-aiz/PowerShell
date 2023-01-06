@@ -58,7 +58,7 @@ public class MainWindow : System.Windows.Window
         WindowStyle = WindowStyle.None;
         Background = Brushes.Transparent;
         ShowInTaskbar = false;
-        this.Width = 450;
+        this.Width = 500;
         this.SizeToContent = SizeToContent.Height;
         
         _stackPanel.RenderSizeChanged += MainStackPanel_RenderSizeChanged ;
@@ -76,7 +76,6 @@ public class MainWindow : System.Windows.Window
 
     protected override void OnClosing (System.ComponentModel.CancelEventArgs e)
     {
-        Console.WriteLine("MainWindow.OnClosing");
         base.OnClosing(e);
     }
 
@@ -147,10 +146,13 @@ abstract class CustomPanel : Grid, IDisposable
 
     protected string IconText = "\uF0E3";
 
-    protected Button closeButton;
-    protected Button copyButton;
-
+    protected Button _closeButton;
+    protected Button _copyButton;
+    protected TextBlock _sourceTextBigin;
+    protected TextBlock _sourceTextEnd;
     protected StackPanel _buttonStack;
+    protected DockPanel _textDock;
+    protected DockPanel _bottomDock;
 
     protected abstract void CopyButton_Click (object sender, RoutedEventArgs e);
 
@@ -183,27 +185,56 @@ abstract class CustomPanel : Grid, IDisposable
             Margin = new Thickness(10.0, 10.0, 5.0, 0.0)
         };
         SetColumn(textIcon, 0);
-        this.closeButton = new Button{
+        this._closeButton = new Button{
             Style = CloseButtonStyle()
         };
-        this.closeButton.Click += new RoutedEventHandler(CloseButton_Click);
-        SetColumn(closeButton, 2);
+        this._closeButton.Click += new RoutedEventHandler(CloseButton_Click);
+        SetColumn(this._closeButton, 2);
 
-        this.copyButton = new Button{
+        this._copyButton = new Button{
             Style = ActionButtonStyle("Copy")
         };
-        this.copyButton.Click += new RoutedEventHandler(CopyButton_Click);
+        this._copyButton.Click += new RoutedEventHandler(CopyButton_Click);
+
+        this._bottomDock = new DockPanel();
+        SetRow(this._bottomDock, 1);
+        SetColumnSpan(this._bottomDock, 3);
 
         this._buttonStack = new StackPanel{
             Orientation = Orientation.Horizontal,
             FlowDirection = FlowDirection.RightToLeft
         };
-        SetRow(this._buttonStack, 1);
-        SetColumnSpan(this._buttonStack, 3);
-        this._buttonStack.Children.Add(this.copyButton);
+        DockPanel.SetDock(this._buttonStack, Dock.Right);
+
+        this._textDock = new DockPanel{
+            Margin = new Thickness{Left = 10.0, Right = 10.0},
+        };
+        DockPanel.SetDock(this._textDock, Dock.Left);
+
+        this._sourceTextBigin = new TextBlock{
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = ForegroundBrush,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        };
+        DockPanel.SetDock(this._sourceTextBigin, Dock.Left);
+
+        this._sourceTextEnd = new TextBlock{
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = ForegroundBrush
+        };
+        DockPanel.SetDock(this._sourceTextEnd, Dock.Right);
+
+        this._textDock.Children.Add(this._sourceTextEnd);
+        this._textDock.Children.Add(this._sourceTextBigin);
+        this._buttonStack.Children.Add(this._copyButton);
+
+        this._bottomDock.Children.Add(this._buttonStack);
+        this._bottomDock.Children.Add(this._textDock);
+
+
         this.Children.Add(textIcon);
-        this.Children.Add(this.closeButton);
-        this.Children.Add(this._buttonStack);
+        this.Children.Add(this._closeButton);
+        this.Children.Add(this._bottomDock);
     }
 
     private void CloseButton_Click (object sender, RoutedEventArgs e)
@@ -420,7 +451,7 @@ class HyperlinkPanel : CustomPanel
 class ImagePanel : CustomPanel
 {
     private BitmapSource _bmpSource;
-    private string _urlString;
+    private Uri _sourceUri;
 
     public ImagePanel (BitmapSource bmpSource)
     {
@@ -446,7 +477,9 @@ class ImagePanel : CustomPanel
 
     public ImagePanel (BitmapSource bmpSource, string urlString) : this(bmpSource)
     {
-        this._urlString = urlString;
+        this._sourceUri = new Uri(urlString);
+        this._sourceTextBigin.Text = this._sourceUri.GetLeftPart(UriPartial.Query);
+        this._sourceTextEnd.Text = Path.GetFileName(this._sourceUri.OriginalString);
     }
 
     protected override void CopyButton_Click (object sender, RoutedEventArgs e)
@@ -466,8 +499,8 @@ class ImagePanel : CustomPanel
         dialog.Filter = "PNG(*.png)|*.png|全てのファイル(*.*)|*.*";
         dialog.InitialDirectory = AppSettings.SaveImageFolder;
 
-        if (null != this._urlString)
-            dialog.FileName = Path.Combine(dialog.InitialDirectory , Path.GetFileName(this._urlString));
+        if (null != this._sourceUri)
+            dialog.FileName = Path.Combine(dialog.InitialDirectory , Path.GetFileName(this._sourceUri.OriginalString));
 
         var result = dialog.ShowDialog(this.GetWindowObject());
         
