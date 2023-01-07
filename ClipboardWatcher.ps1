@@ -37,16 +37,20 @@ Try {
 Add-Type -TypeDefinition @'
 using System;
 using System.IO;
+using System.Net;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Navigation;
 using System.Windows.Media.Imaging;
 using System.Diagnostics;
 using System.Configuration;
 using Microsoft.Win32;
+using System.Runtime.InteropServices;
+using System.ComponentModel;
 
 public class MainWindow : System.Windows.Window
 {
@@ -150,7 +154,7 @@ abstract class CustomPanel : Grid, IDisposable
 
     protected Button _closeButton;
     protected Button _copyButton;
-    protected TextBlock _sourceTextBigin;
+    protected TextBlock _sourceTextBegin;
     protected TextBlock _sourceTextEnd;
     protected StackPanel _buttonStack;
     protected DockPanel _textDock;
@@ -215,21 +219,23 @@ abstract class CustomPanel : Grid, IDisposable
         };
         DockPanel.SetDock(this._textDock, Dock.Left);
 
-        this._sourceTextBigin = new TextBlock{
+        this._sourceTextBegin = new TextBlock{
             VerticalAlignment = VerticalAlignment.Center,
             Foreground = ForegroundBrush,
-            TextTrimming = TextTrimming.CharacterEllipsis
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            BaselineOffset = 2
         };
-        DockPanel.SetDock(this._sourceTextBigin, Dock.Left);
+        DockPanel.SetDock(this._sourceTextBegin, Dock.Left);
 
         this._sourceTextEnd = new TextBlock{
             VerticalAlignment = VerticalAlignment.Center,
-            Foreground = ForegroundBrush
+            Foreground = ForegroundBrush,
+            BaselineOffset = 2
         };
         DockPanel.SetDock(this._sourceTextEnd, Dock.Right);
 
         this._textDock.Children.Add(this._sourceTextEnd);
-        this._textDock.Children.Add(this._sourceTextBigin);
+        this._textDock.Children.Add(this._sourceTextBegin);
 
         this._buttonStack.Children.Add(this._copyButton);
 
@@ -247,7 +253,7 @@ abstract class CustomPanel : Grid, IDisposable
         Dispose();
     }
 
-    private Style CloseButtonStyle()
+    private static Style CloseButtonStyle()
     {
         FrameworkElementFactory tb = new FrameworkElementFactory(typeof(TextBlock));
         tb.SetValue(TextBlock.WidthProperty, 15.0);
@@ -285,7 +291,7 @@ abstract class CustomPanel : Grid, IDisposable
         return style;
     }
 
-    protected Style ActionButtonStyle(string caption)
+    protected static Style ActionButtonStyle(string caption)
     {
         FrameworkElementFactory tb = new FrameworkElementFactory(typeof(TextBlock));
         tb.SetValue(TextBlock.PaddingProperty, new Thickness(15.0, 5.0, 15.0, 5.0));
@@ -358,7 +364,7 @@ class TextPanel : CustomPanel
     {
         this._text = text;
         InitializeComponent();
-        this._sourceTextBigin.Text = sourceText;
+        this._sourceTextBegin.Text = sourceText;
     }
 
     private void InitializeComponent()
@@ -396,12 +402,18 @@ class TextPanel : CustomPanel
 class HyperlinkPanel : CustomPanel
 {
     private string _urlString;
+    private string _savedFilePath;
+    private Button _downloadButton;
+    private Button _cancelButton;
+    private Button _openButton;
+    private Button _openFolderButton;
+    private WebClient _webClnt;
 
     public HyperlinkPanel (string urlString, string sourceText)
     {
         this._urlString = urlString;
         InitializeComponent();
-        this._sourceTextBigin.Text = sourceText;
+        this._sourceTextBegin.Text = sourceText;
     }
 
     private void InitializeComponent()
@@ -415,7 +427,7 @@ class HyperlinkPanel : CustomPanel
             Foreground = new SolidColorBrush(new Color {A = 255, R = 3, G = 169, B = 245}),
         };
         hyperlinkContent.TextDecorations = new TextDecorationCollection();
-        hyperlinkContent.RequestNavigate += new System.Windows.Navigation.RequestNavigateEventHandler(RequestNavigate);
+        hyperlinkContent.RequestNavigate += new RequestNavigateEventHandler(RequestNavigate);
         hyperlinkContent.MouseEnter += new MouseEventHandler(Hyperlink_MouseEnter);
         hyperlinkContent.MouseLeave += new MouseEventHandler(Hyperlink_MouseLeave);
 
@@ -429,9 +441,31 @@ class HyperlinkPanel : CustomPanel
         };
         SetColumn(outerTextBlock, 1);
         this.Children.Add(outerTextBlock);
+
+        this._downloadButton = new Button{
+            Style = ActionButtonStyle("Download")
+        };
+        this._downloadButton.Click += new RoutedEventHandler(DownloadButton_Click);
+
+        this._cancelButton = new Button{
+            Style = ActionButtonStyle("Cancel"),
+        };
+        this._cancelButton.Click += new RoutedEventHandler(CancelButton_Click);
+
+        this._openButton = new Button{
+            Style = ActionButtonStyle("Open"),
+        };
+        this._openButton.Click += new RoutedEventHandler(OpenButton_Click);
+
+        this._openFolderButton = new Button{
+            Style = ActionButtonStyle("Open Folder"),
+        };
+        this._openFolderButton.Click += new RoutedEventHandler(OpenFolderButton_Click);
+
+        this._buttonStack.Children.Add(this._downloadButton);
     }
 
-    private void RequestNavigate(object sender, System.Windows.Navigation.RequestNavigateEventArgs e)
+    private void RequestNavigate(object sender, RequestNavigateEventArgs e)
     {
         try {
             Process.Start( new ProcessStartInfo( e.Uri.AbsoluteUri ) );
@@ -463,6 +497,89 @@ class HyperlinkPanel : CustomPanel
 
         } catch { }
     }
+
+    protected void DownloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog();
+        dialog.InitialDirectory = AppSettings.DownloadFolder;
+        dialog.Filter = "All file (*.*)|*.*";
+
+        if (null != this._urlString) {
+            var uriObj = new Uri(this._urlString);
+            var uriPath = uriObj.GetLeftPart(UriPartial.Path);
+            dialog.FileName = Path.Combine(dialog.InitialDirectory , Path.GetFileName(Uri.UnescapeDataString(uriPath)));
+            var ext = Path.GetExtension(uriPath);
+            dialog.Filter = String.Format("{0} (*{1})|*{1}|{2}", ext.Trim('.').ToUpper(), ext, dialog.Filter);
+        }
+
+        var result = dialog.ShowDialog(this.GetWindowObject());
+        
+        if (true != result)
+            return;
+
+        _webClnt = new WebClient();
+
+        this._buttonStack.Children.Remove(this._downloadButton);
+        this._buttonStack.Children.Add(this._cancelButton);
+        try {
+            this._webClnt.DownloadProgressChanged += new DownloadProgressChangedEventHandler(
+                DownloadProgressChangedCallback);
+            this._webClnt.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCallback);
+            this._webClnt.DownloadFileAsync(new Uri(this._urlString), dialog.FileName, dialog.FileName);
+        } catch {
+            this._buttonStack.Children.Remove(this._cancelButton);
+            this._buttonStack.Children.Add(this._downloadButton);
+        }
+    }
+
+    protected void CancelButton_Click(object sender, RoutedEventArgs e)
+    {
+        this._webClnt.CancelAsync();
+    }
+
+    protected void OpenButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (null == this._savedFilePath)
+            return;
+
+        Process.Start(this._savedFilePath);
+    }
+
+    protected void OpenFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (null == this._savedFilePath)
+            return;
+
+        Process.Start("explorer.exe", String.Format("/select,\"{0}\"", this._savedFilePath));
+    }
+
+    protected void DownloadFileCallback(object sender, AsyncCompletedEventArgs e)
+    {
+        Console.WriteLine(e.UserState);
+
+        if (e.Cancelled || null != e.Error) {
+            Console.WriteLine("Download Cancelled");
+            this._buttonStack.Children.Remove(this._cancelButton);
+            this._buttonStack.Children.Add(this._downloadButton);
+        } else {
+            Console.WriteLine("Download Completed");
+            this._savedFilePath = (string)e.UserState;
+            this._buttonStack.Children.Remove(this._cancelButton);
+            this._buttonStack.Children.Add(this._openButton);
+            this._buttonStack.Children.Add(this._openFolderButton);
+            var fi = new FileInfo(this._savedFilePath);
+            if (fi.Exists)
+                this._sourceTextBegin.Text = String.Format("{0} - ", fi.Name);
+                this._sourceTextEnd.Text = String.Format("{0}KB", (fi.Length / 1024));
+        }
+
+        this._webClnt.Dispose();
+    }
+
+    protected void DownloadProgressChangedCallback(object sender, DownloadProgressChangedEventArgs e)
+    {
+        Console.WriteLine(e.ProgressPercentage);
+    }
 }
 
 class ImagePanel : CustomPanel
@@ -475,7 +592,7 @@ class ImagePanel : CustomPanel
         this._bmpSource = bmpSource;
         InitializeComponent();
         this._sourceText = sourceText;
-        this._sourceTextBigin.Text = sourceText;
+        this._sourceTextBegin.Text = sourceText;
     }
 
     public ImagePanel (BitmapSource bmpSource, Uri sourceUri)
@@ -483,7 +600,7 @@ class ImagePanel : CustomPanel
         this._bmpSource = bmpSource;
         InitializeComponent();
         this._sourceText = sourceUri.OriginalString;
-        this._sourceTextBigin.Text = Path.GetDirectoryName(this._sourceText).Replace('\\', '/');
+        this._sourceTextBegin.Text = Path.GetDirectoryName(this._sourceText).Replace('\\', '/');
         this._sourceTextEnd.Text = '/' + Path.GetFileName(this._sourceText);
     }
 
@@ -520,7 +637,6 @@ class ImagePanel : CustomPanel
 
     protected void SaveButton_Click (object sender, RoutedEventArgs e)
     {
-
         var dialog = new SaveFileDialog();
         dialog.Filter = "PNG (*.png)|*.png|JPG (*.jpg)|*.jpg|BMP (*.bmp)|*.bmp|All file (*.*)|*.*";
         dialog.InitialDirectory = AppSettings.SaveImageFolder;
@@ -552,9 +668,28 @@ class ImagePanel : CustomPanel
 
 public class AppSettings
 {
+    [DllImport("shell32.dll", CharSet=CharSet.Auto)]
+    private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint dwFlags, IntPtr hToken, out string pszPath);
+    
+    private static readonly Guid Downloads = new Guid("374DE290-123F-4565-9164-39C4925E467B");
     public static string SaveImageFolder = ConfigurationManager.AppSettings["SaveImageFolder"] ?? Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
+    private static string _downloadFolder = ConfigurationManager.AppSettings["DownloadFolder"];
+    public static string DownloadFolder{
+        get
+        {
+            if (null == _downloadFolder) {
+                string path;
+                SHGetKnownFolderPath(Downloads, 0, IntPtr.Zero, out path);
+                _downloadFolder = path;
+            }
+            return _downloadFolder;
+        }
+        set
+        {
+            _downloadFolder = value;
+        }
+    }
 }
-
 '@ -ReferencedAssemblies WindowsBase, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
 }
 #endregion
