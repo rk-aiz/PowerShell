@@ -2,7 +2,9 @@
 
 #>
 using namespace System.Windows
+using namespace System.Windows.Media.Imaging
 using namespace System.Text
+
 Param(
     [Parameter()]
     [switch] $Disable,
@@ -79,24 +81,24 @@ public class MainWindow : System.Windows.Window
         base.OnClosing(e);
     }
 
-    public void AddTextPanel (string text)
+    public void AddTextPanel (string text, string sourceText)
     {
-        _stackPanel.Children.Add(new TextPanel(text));
+        this._stackPanel.Children.Add(new TextPanel(text, sourceText));
     }
 
-    public void AddHyperlinkPanel (string text)
+    public void AddHyperlinkPanel (string text, string sourceText)
     {
-        _stackPanel.Children.Add(new HyperlinkPanel(text));
+        this._stackPanel.Children.Add(new HyperlinkPanel(text, sourceText));
     }
 
-    public void AddImagePanel (BitmapSource bmpSource)
+    public void AddImagePanel (BitmapSource bmpSource, string sourceText)
     {
-        _stackPanel.Children.Add(new ImagePanel(bmpSource));
+        this._stackPanel.Children.Add(new ImagePanel(bmpSource, sourceText));
     }
 
-    public void AddImagePanel (BitmapSource bmpSource, string urlString)
+    public void AddImagePanel (BitmapSource bmpSource, Uri sourceUri)
     {
-        _stackPanel.Children.Add(new ImagePanel(bmpSource, urlString));
+        this._stackPanel.Children.Add(new ImagePanel(bmpSource, sourceUri));
     }
 
     private void SetWindowLocation()
@@ -196,7 +198,9 @@ abstract class CustomPanel : Grid, IDisposable
         };
         this._copyButton.Click += new RoutedEventHandler(CopyButton_Click);
 
-        this._bottomDock = new DockPanel();
+        this._bottomDock = new DockPanel{
+            LastChildFill = false
+        };
         SetRow(this._bottomDock, 1);
         SetColumnSpan(this._bottomDock, 3);
 
@@ -207,7 +211,7 @@ abstract class CustomPanel : Grid, IDisposable
         DockPanel.SetDock(this._buttonStack, Dock.Right);
 
         this._textDock = new DockPanel{
-            Margin = new Thickness{Left = 10.0, Right = 10.0},
+            Margin = new Thickness{Left = 10.0, Right = 10.0}
         };
         DockPanel.SetDock(this._textDock, Dock.Left);
 
@@ -226,6 +230,7 @@ abstract class CustomPanel : Grid, IDisposable
 
         this._textDock.Children.Add(this._sourceTextEnd);
         this._textDock.Children.Add(this._sourceTextBigin);
+
         this._buttonStack.Children.Add(this._copyButton);
 
         this._bottomDock.Children.Add(this._buttonStack);
@@ -320,9 +325,9 @@ abstract class CustomPanel : Grid, IDisposable
         return style;
     }
 
-    protected Window GetWindowObject ()
+    protected Window GetWindowObject()
     {
-        try{
+        try {
             DependencyObject dpObj = this;
             while (null != dpObj) {
                 dpObj = VisualTreeHelper.GetParent(dpObj);
@@ -349,15 +354,21 @@ class TextPanel : CustomPanel
 {
     private string _text;
 
-    public TextPanel(string text)
+    public TextPanel(string text, string sourceText)
     {
-        _text = text;
+        this._text = text;
+        InitializeComponent();
+        this._sourceTextBigin.Text = sourceText;
+    }
+
+    private void InitializeComponent()
+    {
         this.IconText = "\uF000";
         InitializeChildren();
 
         TextBox textContent = new TextBox
         {
-            Text = text,
+            Text = this._text,
             IsReadOnly = true,
             BorderThickness = new Thickness(0.0),
             Background = Brushes.Transparent,
@@ -385,15 +396,22 @@ class TextPanel : CustomPanel
 class HyperlinkPanel : CustomPanel
 {
     private string _urlString;
-    public HyperlinkPanel (string urlString)
+
+    public HyperlinkPanel (string urlString, string sourceText)
     {
         this._urlString = urlString;
+        InitializeComponent();
+        this._sourceTextBigin.Text = sourceText;
+    }
+
+    private void InitializeComponent()
+    {
         this.IconText = "\uE167";
         InitializeChildren();
 
-        Hyperlink hyperlinkContent = new Hyperlink(new Run(urlString))
+        Hyperlink hyperlinkContent = new Hyperlink(new Run(this._urlString))
         {
-            NavigateUri = new Uri(urlString),
+            NavigateUri = new Uri(this._urlString),
             Foreground = new SolidColorBrush(new Color {A = 255, R = 3, G = 169, B = 245}),
         };
         hyperlinkContent.TextDecorations = new TextDecorationCollection();
@@ -418,8 +436,7 @@ class HyperlinkPanel : CustomPanel
         try {
             Process.Start( new ProcessStartInfo( e.Uri.AbsoluteUri ) );
             e.Handled = true;
-        }
-        catch { }
+        } catch { }
     }
 
     private void Hyperlink_MouseEnter( object sender, MouseEventArgs e )
@@ -451,16 +468,32 @@ class HyperlinkPanel : CustomPanel
 class ImagePanel : CustomPanel
 {
     private BitmapSource _bmpSource;
-    private Uri _sourceUri;
+    private string _sourceText;
 
-    public ImagePanel (BitmapSource bmpSource)
+    public ImagePanel (BitmapSource bmpSource, string sourceText)
     {
         this._bmpSource = bmpSource;
+        InitializeComponent();
+        this._sourceText = sourceText;
+        this._sourceTextBigin.Text = sourceText;
+    }
+
+    public ImagePanel (BitmapSource bmpSource, Uri sourceUri)
+    {
+        this._bmpSource = bmpSource;
+        InitializeComponent();
+        this._sourceText = sourceUri.OriginalString;
+        this._sourceTextBigin.Text = Path.GetDirectoryName(this._sourceText).Replace('\\', '/');
+        this._sourceTextEnd.Text = '/' + Path.GetFileName(this._sourceText);
+    }
+
+    private void InitializeComponent()
+    {
         this.IconText = "\uEB9F";
         InitializeChildren();
 
         Image imageContent = new Image{
-            Source = bmpSource,
+            Source = this._bmpSource,
             Margin = new Thickness(5.0),
             StretchDirection = StretchDirection.DownOnly,
             HorizontalAlignment = HorizontalAlignment.Left
@@ -473,13 +506,6 @@ class ImagePanel : CustomPanel
         };
         saveButton.Click += new RoutedEventHandler(SaveButton_Click);
         this._buttonStack.Children.Add(saveButton);
-    }
-
-    public ImagePanel (BitmapSource bmpSource, string urlString) : this(bmpSource)
-    {
-        this._sourceUri = new Uri(urlString);
-        this._sourceTextBigin.Text = this._sourceUri.GetLeftPart(UriPartial.Query);
-        this._sourceTextEnd.Text = Path.GetFileName(this._sourceUri.OriginalString);
     }
 
     protected override void CopyButton_Click (object sender, RoutedEventArgs e)
@@ -496,11 +522,11 @@ class ImagePanel : CustomPanel
     {
 
         var dialog = new SaveFileDialog();
-        dialog.Filter = "PNG(*.png)|*.png|全てのファイル(*.*)|*.*";
+        dialog.Filter = "PNG (*.png)|*.png|JPG (*.jpg)|*.jpg|BMP (*.bmp)|*.bmp|All file (*.*)|*.*";
         dialog.InitialDirectory = AppSettings.SaveImageFolder;
 
-        if (null != this._sourceUri)
-            dialog.FileName = Path.Combine(dialog.InitialDirectory , Path.GetFileName(this._sourceUri.OriginalString));
+        if (null != this._sourceText)
+            dialog.FileName = Path.Combine(dialog.InitialDirectory , Path.GetFileNameWithoutExtension(this._sourceText));
 
         var result = dialog.ShowDialog(this.GetWindowObject());
         
@@ -509,7 +535,15 @@ class ImagePanel : CustomPanel
         
         using (var fileStream = new FileStream(dialog.FileName, FileMode.Create))
         {
-            var encoder = new PngBitmapEncoder();
+            string extention = Path.GetExtension(dialog.FileName).ToLower();
+            BitmapEncoder encoder;
+            if (".jpg" == extention || ".jpeg" == extention) {
+                encoder = new JpegBitmapEncoder();
+            } else if (".png" == extention) {
+                encoder = new PngBitmapEncoder();
+            } else {
+                encoder = new BmpBitmapEncoder();
+            }
             encoder.Frames.Add(BitmapFrame.Create(this._bmpSource));
             encoder.Save(fileStream);
         }
@@ -531,6 +565,7 @@ Try {
 } Catch {
 Add-Type -TypeDefinition @'
 using System;
+using System.Text;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Runtime.InteropServices;
@@ -543,6 +578,9 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
     [DllImport("user32.dll")]
     private static extern bool RemoveClipboardFormatListener(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetClipboardOwner();
+
     private const int WM_DRAWCLIPBOARD = 0x031D;
     private bool listenState = false;
     public NotifyIcon _notifyIcon;
@@ -550,7 +588,8 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
         get { return _notifyIcon; }
     }
 
-    public event EventHandler ClipboardChanged;
+    public delegate void ClipboardChangedEventHandler(object sender, ClipboardChangedEventArgs e);
+    public event ClipboardChangedEventHandler ClipboardChanged = (sender, e) => { };
 
     public ClipBoardWatcher()
     {
@@ -582,20 +621,19 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
         return menuStrip;
     }
 
-    protected override void WndProc(ref Message m) 
+    protected override void WndProc(ref Message m)
     {
-        if (m.Msg == WM_DRAWCLIPBOARD)
-            this.OnClipboardChanged();
-
+        if (m.Msg == WM_DRAWCLIPBOARD) {
+            IntPtr hWnd = GetClipboardOwner();
+            this.OnClipboardChanged(hWnd);
+        }
         base.WndProc(ref m);
     }
 
-    public void OnClipboardChanged()
+    public void OnClipboardChanged(IntPtr hWnd)
     {
-        var cc = this.ClipboardChanged;
-        if (null != cc)
-            ClipboardChanged.Invoke(this, EventArgs.Empty);
-
+        var e = new ClipboardChangedEventArgs(hWnd);
+        ClipboardChanged.Invoke(this, e);
     }
 
     public void Start()
@@ -610,8 +648,35 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
             this.listenState = RemoveClipboardFormatListener(this.Handle) ? false : true;
     }
 }
+
+public class ClipboardChangedEventArgs : EventArgs
+{
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    private IntPtr _hWnd;
+    public IntPtr Handle { get {return _hWnd; } }
+    
+    public ClipboardChangedEventArgs(IntPtr hWnd)
+    {
+        this._hWnd = hWnd;
+    }
+
+    public uint GetSourceProcessId()
+    {
+        if (null == this._hWnd)
+            return 0;
+        
+        uint processId = 0;
+        try {
+            uint threadId = GetWindowThreadProcessId(this._hWnd, out processId);
+        } catch { }
+        return processId;
+    }
+}
 '@ -ReferencedAssemblies System.Windows.Forms, System.Drawing -ErrorAction Stop
 }
+
 #endregion
 
 if ($UserDebug) {
@@ -646,6 +711,10 @@ function Program
     {
         Param($s, $e)
 
+        $sProcess = Get-Process -Id $e.GetSourceProcessId()
+
+        Write-Debug ("ClipboardChanged : {0}" -f $sProcess.MainModule.ModuleName)
+
         $dataObj = [Clipboard]::GetDataObject()
 
         if ($null -eq $dataObj) {
@@ -653,15 +722,17 @@ function Program
         }
         Write-Debug ($dataObj.GetFormats() -join ' ')
 
+        $sourceText = '{0} - {1}' -f $sProcess.MainModule.ModuleName, [DateTime]::Now.ToString("HH:mm:ss")
+
         if ($dataObj.ContainsText())
         {
             $text = $dataObj.GetText()
             if ($UrlRegEx.IsMatch($text)) {
-                $MainWindow.AddHyperlinkPanel($text)
+                $MainWindow.AddHyperlinkPanel($text, $sourceText)
             }
             elseif ($text -notmatch "^\s*$")
             {
-                $MainWindow.AddTextPanel($text)
+                $MainWindow.AddTextPanel($text, $sourceText)
             }
         }
         elseif ($dataObj.ContainsImage())
@@ -674,12 +745,12 @@ function Program
                 $urlString = [Encoding]::UTF8.GetString($converted).Trim("`0")
                 Write-Debug ("Source URL : $urlString")
                 if ($UrlRegEx.IsMatch($urlString)) {
-                    $MainWindow.AddImagePanel($dataObj.GetImage(), $urlString)
+                    $MainWindow.AddImagePanel($dataObj.GetImage(), (New-Object System.Uri $urlString))
                     return
                 }
             }
 
-            $MainWindow.AddImagePanel($dataObj.GetImage())
+            $MainWindow.AddImagePanel($dataObj.GetImage(), $sourceText)
         }
     })
 
