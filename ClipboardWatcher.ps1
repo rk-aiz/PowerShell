@@ -30,7 +30,7 @@ if ($ShowConsole -eq $false)
 }
 
 #============================================================================ #
-#region MainWindow
+#region WPF
 Try {
     [void][MainWindow]
 } Catch {
@@ -38,9 +38,12 @@ Add-Type -TypeDefinition @'
 using System;
 using System.IO;
 using System.Net;
+using System.Net.Http;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using System.Windows.Documents;
 using System.Windows.Input;
@@ -52,6 +55,7 @@ using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.ComponentModel;
 
+#region MainWindow
 public class MainWindow : System.Windows.Window
 {
     private MainStackPanel _stackPanel = new MainStackPanel();
@@ -124,7 +128,138 @@ public class MainWindow : System.Windows.Window
         }
     }
 }
+#endregion
 
+#region Paint
+public class Paint
+{
+    public static Brush ForegroundBrush = new SolidColorBrush(Colors.WhiteSmoke);
+
+    public static Color MouseOverBackgroundColor = new Color {A = 255, R = 70, G = 70, B = 70};
+    public static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
+
+    public static Color ButtonBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
+    public static Brush ButtonBackgroundBrush = new SolidColorBrush(ButtonBackgroundColor);
+
+    public static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 75, G = 75, B = 75};
+    public static Brush ButtonMouseOverBackgroundBrush = new SolidColorBrush(ButtonMouseOverBackgroundColor);
+
+    public static Color ProgressedColor = new Color {A = 255, R = 25, G = 120, B = 235};
+    public static Brush ProgressedBrush = new SolidColorBrush(ProgressedColor);
+
+    public static Color ProgressedMouseOverColor = new Color {A = 255, R = 35, G = 145, B = 255};
+    public static Brush ProgressedMouseOverBrush = new SolidColorBrush(ProgressedMouseOverColor);
+}
+#endregion
+
+public class ProgressRect : INotifyPropertyChanged
+{
+    private Rect _progressRectProperty;
+
+    public ProgressRect() { }
+
+    public ProgressRect(Rect pRect)
+    {
+        this._progressRectProperty = pRect;
+    }
+
+    public ProgressRect(double pRx, double pRy, double pRWidth, double pRHeight)
+    {
+        this._progressRectProperty = new Rect(pRx, pRy, pRWidth, pRHeight);
+    }
+
+    public Rect ProgressRectProperty
+    {
+        get { return _progressRectProperty; }
+        set
+        {
+            this._progressRectProperty = value;
+            OnPropertyChanged("ProgressRectProperty");
+        }
+    }
+
+    public void SetProgress(double pRWidth)
+    {
+        this._progressRectProperty.Width = pRWidth;
+        OnPropertyChanged("ProgressRectProperty");
+    }
+
+    public event PropertyChangedEventHandler PropertyChanged;
+
+    private void OnPropertyChanged(string info)
+    {
+        PropertyChangedEventHandler handler = PropertyChanged;
+        if (handler != null)
+        {
+            handler(this, new PropertyChangedEventArgs(info));
+        }
+    }
+}
+
+public class CustomButton : System.Windows.Controls.Primitives.ButtonBase
+{
+    private Point _progressPoint = new Point(0.0, 0.5);
+    private TextBlock _textBlock;
+    private Grid _grid;
+    private System.Windows.Shapes.Rectangle _backgroundRect;
+
+    private Brush _backgroundBrush = Paint.ButtonBackgroundBrush;
+    private Brush _mouseOverBackgroundBrush = Paint.MouseOverBackgroundBrush;
+
+    public CustomButton(string caption)
+    {
+        this.Margin = new Thickness{Left = 15.0, Bottom = 15.0};
+
+        this._textBlock = new TextBlock{
+            Padding = new Thickness(15.0, 5.0, 15.0, 5.0),
+            FontSize = 14.0,
+            TextAlignment = TextAlignment.Center,
+            Foreground = Paint.ForegroundBrush,
+            Text = caption
+        };
+
+        this._backgroundRect = new System.Windows.Shapes.Rectangle{
+            RadiusX = 5.0,
+            RadiusY = 5.0,
+            Fill = this._backgroundBrush
+        };
+
+        this._grid = new Grid{
+            FlowDirection = FlowDirection.LeftToRight
+        };
+        this._grid.Children.Add(this._backgroundRect);
+        this._grid.Children.Add(this._textBlock);
+        //this._backgroundbrush = new LinearGradientBrush(Paint.ProgressedColor, Paint.ButtonBackgroundColor, _progressPoint, _progressPoint);
+
+        this.Content = this._grid;
+        this.MouseEnter += new MouseEventHandler(CustomButton_MouseEnter);
+        this.MouseLeave += new MouseEventHandler(CustomButton_MouseLeave);
+    }
+
+    public void SetBackground(Brush background, Brush mouseover)
+    {
+        this._backgroundBrush = background;
+        this._mouseOverBackgroundBrush = mouseover;
+        this._backgroundRect.Fill = this._backgroundBrush;
+    }
+
+    public void AddBackgroundRect(System.Windows.Shapes.Rectangle rect)
+    {
+        this._grid.Children.Insert(1, rect);
+    }
+
+    private void CustomButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        this._backgroundRect.Fill = this._mouseOverBackgroundBrush;
+    }
+
+    private void CustomButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        this._backgroundRect.Fill = this._backgroundBrush;
+    }
+}
+
+#region Panel
 class MainStackPanel : StackPanel
 {
     public event EventHandler RenderSizeChanged = (sender, e) => { };
@@ -137,23 +272,13 @@ class MainStackPanel : StackPanel
 
 abstract class CustomPanel : Grid, IDisposable
 {
-    protected static Brush ForegroundBrush = new SolidColorBrush(Colors.WhiteSmoke);
-
-    protected static Color MouseOverBackgroundColor = new Color {A = 255, R = 70, G = 70, B = 70};
-    protected static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
-
-    protected static Color ButtonBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
-    protected static Brush ButtonBackgroundBrush = new SolidColorBrush(ButtonBackgroundColor);
-
-    protected static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 75, G = 75, B = 75};
-    protected static Brush ButtonMouseOverBackgroundBrush = new SolidColorBrush(ButtonMouseOverBackgroundColor);
 
     protected static FontFamily IconFont = new FontFamily("Segoe MDL2 Assets");
 
     protected string IconText = "\uF0E3";
 
     protected Button _closeButton;
-    protected Button _copyButton;
+    protected CustomButton _copyButton;
     protected TextBlock _sourceTextBegin;
     protected TextBlock _sourceTextEnd;
     protected StackPanel _buttonStack;
@@ -167,7 +292,7 @@ abstract class CustomPanel : Grid, IDisposable
         this.HorizontalAlignment = HorizontalAlignment.Stretch;
         this.Margin = new Thickness{Top = 15.0};
         this.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
-        this.Effect = new System.Windows.Media.Effects.DropShadowEffect
+        this.Effect = new DropShadowEffect
         {
             Color = Colors.Black,
             BlurRadius = 15.0,
@@ -187,7 +312,7 @@ abstract class CustomPanel : Grid, IDisposable
             FontFamily = IconFont,
             Text = IconText,
             FontSize = 20.0,
-            Foreground = ForegroundBrush,
+            Foreground = Paint.ForegroundBrush,
             Margin = new Thickness(10.0, 10.0, 5.0, 0.0)
         };
         SetColumn(textIcon, 0);
@@ -197,9 +322,7 @@ abstract class CustomPanel : Grid, IDisposable
         this._closeButton.Click += new RoutedEventHandler(CloseButton_Click);
         SetColumn(this._closeButton, 2);
 
-        this._copyButton = new Button{
-            Style = ActionButtonStyle("Copy")
-        };
+        this._copyButton = new CustomButton("Copy");
         this._copyButton.Click += new RoutedEventHandler(CopyButton_Click);
 
         this._bottomDock = new DockPanel{
@@ -221,7 +344,7 @@ abstract class CustomPanel : Grid, IDisposable
 
         this._sourceTextBegin = new TextBlock{
             VerticalAlignment = VerticalAlignment.Center,
-            Foreground = ForegroundBrush,
+            Foreground = Paint.ForegroundBrush,
             TextTrimming = TextTrimming.CharacterEllipsis,
             BaselineOffset = 2
         };
@@ -229,7 +352,7 @@ abstract class CustomPanel : Grid, IDisposable
 
         this._sourceTextEnd = new TextBlock{
             VerticalAlignment = VerticalAlignment.Center,
-            Foreground = ForegroundBrush,
+            Foreground = Paint.ForegroundBrush,
             BaselineOffset = 2
         };
         DockPanel.SetDock(this._sourceTextEnd, Dock.Right);
@@ -261,7 +384,7 @@ abstract class CustomPanel : Grid, IDisposable
         tb.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
         tb.SetValue(TextBlock.FontSizeProperty, 15.0);
         tb.SetValue(TextBlock.FontWeightProperty, FontWeights.UltraBold);
-        tb.SetValue(TextBlock.ForegroundProperty, ForegroundBrush);
+        tb.SetValue(TextBlock.ForegroundProperty, Paint.ForegroundBrush);
         tb.SetValue(TextBlock.FontFamilyProperty, new FontFamily("Segoe MDL2 Assets"));
         tb.SetValue(TextBlock.TextProperty, "\uE10A");
 
@@ -281,7 +404,7 @@ abstract class CustomPanel : Grid, IDisposable
         mouseOverTrigger.Setters.Add(new Setter{
             TargetName = "border",
             Property = Border.BackgroundProperty,
-            Value = MouseOverBackgroundBrush
+            Value = Paint.MouseOverBackgroundBrush
         });
 
         ct.Triggers.Add(mouseOverTrigger);
@@ -297,17 +420,15 @@ abstract class CustomPanel : Grid, IDisposable
         tb.SetValue(TextBlock.PaddingProperty, new Thickness(15.0, 5.0, 15.0, 5.0));
         tb.SetValue(TextBlock.FontSizeProperty, 14.0);
         tb.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
-        tb.SetValue(TextBlock.ForegroundProperty, ForegroundBrush);
+        tb.SetValue(TextBlock.ForegroundProperty, Paint.ForegroundBrush);
         tb.SetValue(TextBlock.TextProperty, caption);
 
         FrameworkElementFactory factory = new FrameworkElementFactory(typeof(Border));
         factory.Name = "border";
         factory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
         factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
-        factory.SetValue(Border.BackgroundProperty, ButtonBackgroundBrush);
+        factory.SetValue(Border.BackgroundProperty, Paint.ButtonBackgroundBrush);
         factory.AppendChild(tb);
-        ControlTemplate ct = new ControlTemplate(typeof(Button));
-        ct.VisualTree = factory;
 
         MultiTrigger mouseOverTrigger = new MultiTrigger();
         mouseOverTrigger.Conditions.Add(new Condition{
@@ -321,10 +442,13 @@ abstract class CustomPanel : Grid, IDisposable
         mouseOverTrigger.Setters.Add(new Setter{
             TargetName = "border",
             Property = Border.BackgroundProperty,
-            Value = ButtonMouseOverBackgroundBrush
+            Value = Paint.ButtonMouseOverBackgroundBrush
         });
 
+        ControlTemplate ct = new ControlTemplate(typeof(Button));
+        ct.VisualTree = factory;
         ct.Triggers.Add(mouseOverTrigger);
+
         Style style = new Style(typeof(Button));
         style.Setters.Add(new Setter(Button.TemplateProperty, ct));
         style.Setters.Add(new Setter(Button.MarginProperty, new Thickness{Left = 15.0, Bottom = 15.0})); //FlowDirection.RightToLeftの為 Leftマージンを設定
@@ -378,7 +502,7 @@ class TextPanel : CustomPanel
             IsReadOnly = true,
             BorderThickness = new Thickness(0.0),
             Background = Brushes.Transparent,
-            Foreground = ForegroundBrush,
+            Foreground = Paint.ForegroundBrush,
             TextAlignment = TextAlignment.Left,
             FontSize = 17.0,
             Margin = new Thickness(5.0)
@@ -399,15 +523,19 @@ class TextPanel : CustomPanel
     }
 }
 
+#region HyperlinkPanel
 class HyperlinkPanel : CustomPanel
 {
     private string _urlString;
     private string _savedFilePath;
     private Button _downloadButton;
-    private Button _cancelButton;
-    private Button _openButton;
+    private CustomButton _cancelButton;
+    private CustomButton _openButton;
     private Button _openFolderButton;
-    private WebClient _webClnt;
+    private System.Windows.Shapes.Rectangle _progressRect;
+    private RectangleGeometry _progressClip = new RectangleGeometry();
+    private Rect _progressClipRect = new Rect(0.0, 0.0, 0.0, 0.0);
+    private CancellationTokenSource cTokenSource;
 
     public HyperlinkPanel (string urlString, string sourceText)
     {
@@ -433,11 +561,11 @@ class HyperlinkPanel : CustomPanel
 
         TextBlock outerTextBlock = new TextBlock(hyperlinkContent)
         {
-            Foreground = ForegroundBrush,
+            Foreground = Paint.ForegroundBrush,
             TextAlignment = TextAlignment.Left,
             TextWrapping = TextWrapping.Wrap,
             FontSize = 17.0,
-            Margin = new Thickness(5.0),
+            Margin = new Thickness(5.0)
         };
         SetColumn(outerTextBlock, 1);
         this.Children.Add(outerTextBlock);
@@ -447,14 +575,22 @@ class HyperlinkPanel : CustomPanel
         };
         this._downloadButton.Click += new RoutedEventHandler(DownloadButton_Click);
 
-        this._cancelButton = new Button{
-            Style = ActionButtonStyle("Cancel"),
-        };
-        this._cancelButton.Click += new RoutedEventHandler(CancelButton_Click);
+        this._cancelButton = new CustomButton("Cancel");
 
-        this._openButton = new Button{
-            Style = ActionButtonStyle("Open"),
+        this._progressClip.Rect = this._progressClipRect;
+        this._progressRect = new System.Windows.Shapes.Rectangle{
+            RadiusX = 5.0,
+            RadiusY = 5.0,
+            Fill = Paint.ProgressedBrush,
+            Clip = this._progressClip
         };
+        this._cancelButton.AddBackgroundRect(this._progressRect);
+        this._cancelButton.Click += new RoutedEventHandler(CancelButton_Click);
+        this._cancelButton.MouseEnter += new MouseEventHandler(CancelButton_MouseEnter);
+        this._cancelButton.MouseLeave += new MouseEventHandler(CancelButton_MouseLeave);
+
+        this._openButton = new CustomButton("Open");
+        this._openButton.SetBackground(Paint.ProgressedBrush, Paint.ProgressedMouseOverBrush);
         this._openButton.Click += new RoutedEventHandler(OpenButton_Click);
 
         this._openFolderButton = new Button{
@@ -498,7 +634,7 @@ class HyperlinkPanel : CustomPanel
         } catch { }
     }
 
-    protected void DownloadButton_Click(object sender, RoutedEventArgs e)
+    protected async void DownloadButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new SaveFileDialog();
         dialog.InitialDirectory = AppSettings.DownloadFolder;
@@ -517,24 +653,98 @@ class HyperlinkPanel : CustomPanel
         if (true != result)
             return;
 
-        _webClnt = new WebClient();
-
         this._buttonStack.Children.Remove(this._downloadButton);
         this._buttonStack.Children.Add(this._cancelButton);
+        /*
         try {
-            this._webClnt.DownloadProgressChanged += new DownloadProgressChangedEventHandler(
+            this._htttpClnt.DownloadProgressChanged += new DownloadProgressChangedEventHandler(
                 DownloadProgressChangedCallback);
-            this._webClnt.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCallback);
-            this._webClnt.DownloadFileAsync(new Uri(this._urlString), dialog.FileName, dialog.FileName);
+            this._htttpClnt.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCallback);
+            this._htttpClnt.GetAsync(new Uri(this._urlString), dialog.FileName, dialog.FileName);
         } catch {
             this._buttonStack.Children.Remove(this._cancelButton);
             this._buttonStack.Children.Add(this._downloadButton);
+        }*/
+        
+        using (var request  = new HttpRequestMessage(HttpMethod.Get, new Uri(this._urlString)))
+        using (var response = await Http.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+        {
+            if (response.StatusCode != HttpStatusCode.OK) {
+                Console.WriteLine(String.Format("Download StatusCode : {0}", response.StatusCode));
+                this._buttonStack.Children.Remove(this._cancelButton);
+                this._buttonStack.Children.Add(this._downloadButton);
+                return;
+            }
+
+            this.cTokenSource = new CancellationTokenSource();
+
+            this._progressClipRect.Height = this._progressRect.ActualHeight;
+            double contentTotal = (double)response.Content.Headers.ContentLength;
+            byte[] buffer;
+
+            var cToken = this.cTokenSource.Token;
+            using (var fileStream = new FileStream(dialog.FileName, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var content = response.Content)
+            using (var stream = await content.ReadAsStreamAsync())
+            {
+                int readTotal = 0;
+                
+                while (true)
+                {
+                    if (cToken.IsCancellationRequested)
+                    {
+                        Console.WriteLine("Download Cancelled");
+                        this._buttonStack.Children.Remove(this._cancelButton);
+                        this._buttonStack.Children.Add(this._downloadButton);
+                        this._progressClipRect.Width = 0;
+                        this._progressClip.Rect = this._progressClipRect;
+                        this._progressRect.Clip = this._progressClip;
+                        break;
+                    }
+
+                    buffer = new byte[4096];
+                    int count = await stream.ReadAsync(buffer, 0 , buffer.Length);
+
+                    if (count == 0)
+                    {
+                        Console.WriteLine("Download Completed");
+                        this._savedFilePath = dialog.FileName;
+                        this._buttonStack.Children.Remove(this._cancelButton);
+                        this._buttonStack.Children.Add(this._openButton);
+                        this._buttonStack.Children.Add(this._openFolderButton);
+                        var fi = new FileInfo(dialog.FileName);
+                        if (fi.Exists) {
+                            this._sourceTextBegin.Text = String.Format("{0} - ", fi.Name);
+                            this._sourceTextEnd.Text = String.Format("{0}KB", (fi.Length / 1024));
+                        }
+                        break;
+                    }
+
+                    readTotal += count;
+
+                    this._progressClipRect.Width = (this._progressRect.ActualWidth * (readTotal / contentTotal));
+                    this._progressClip.Rect = this._progressClipRect;
+                    this._progressRect.Clip = this._progressClip;
+                    
+                    await fileStream.WriteAsync(buffer, 0, count);
+                }
+            }
         }
     }
-
-    protected void CancelButton_Click(object sender, RoutedEventArgs e)
+    
+    private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        this._webClnt.CancelAsync();
+        this.cTokenSource.Cancel();
+    }
+
+    private void CancelButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        this._progressRect.Fill = Paint.ProgressedMouseOverBrush;
+    }
+
+    private void CancelButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        this._progressRect.Fill = Paint.ProgressedBrush;
     }
 
     protected void OpenButton_Click(object sender, RoutedEventArgs e)
@@ -568,19 +778,25 @@ class HyperlinkPanel : CustomPanel
             this._buttonStack.Children.Add(this._openButton);
             this._buttonStack.Children.Add(this._openFolderButton);
             var fi = new FileInfo(this._savedFilePath);
-            if (fi.Exists)
+            if (fi.Exists) {
                 this._sourceTextBegin.Text = String.Format("{0} - ", fi.Name);
                 this._sourceTextEnd.Text = String.Format("{0}KB", (fi.Length / 1024));
+            }
         }
 
-        this._webClnt.Dispose();
+        //this._htttpClnt.Dispose();
     }
 
+    /*
     protected void DownloadProgressChangedCallback(object sender, DownloadProgressChangedEventArgs e)
     {
-        Console.WriteLine(e.ProgressPercentage);
-    }
+        this._progressClipRect.Width = (this._progressRect.ActualWidth * (e.ProgressPercentage / 100.0));
+        this._progressClipRect.Height = this._progressRect.ActualHeight;
+        this._progressClip.Rect = this._progressClipRect;
+        this._progressRect.Clip = this._progressClip;
+    }*/
 }
+#endregion
 
 class ImagePanel : CustomPanel
 {
@@ -665,6 +881,29 @@ class ImagePanel : CustomPanel
         }
     }
 }
+#endregion
+
+class Http
+{
+    private static HttpClient _client;
+
+    static Http()
+    {
+        _client = new HttpClient();
+    }
+
+	public static HttpClient Client 
+	{ 
+        get
+        {
+            if (_client == null)
+            {
+                _client = new HttpClient();
+            }
+            return _client;
+        } 
+    }
+}
 
 public class AppSettings
 {
@@ -690,7 +929,7 @@ public class AppSettings
         }
     }
 }
-'@ -ReferencedAssemblies WindowsBase, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
+'@ -ReferencedAssemblies WindowsBase, System.Xaml, System.Net.Http, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
 }
 #endregion
 
