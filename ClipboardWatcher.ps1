@@ -91,22 +91,22 @@ public class MainWindow : System.Windows.Window
 
     public void AddTextPanel (string text, string sourceText)
     {
-        this._stackPanel.Children.Add(new TextPanel(text, sourceText));
+        this._stackPanel.AddChild(new TextPanel(text, sourceText));
     }
 
     public void AddHyperlinkPanel (string text, string sourceText)
     {
-        this._stackPanel.Children.Add(new HyperlinkPanel(text, sourceText));
+        this._stackPanel.AddChild(new HyperlinkPanel(text, sourceText));
     }
 
     public void AddImagePanel (BitmapSource bmpSource, string sourceText)
     {
-        this._stackPanel.Children.Add(new ImagePanel(bmpSource, sourceText));
+        this._stackPanel.AddChild(new ImagePanel(bmpSource, sourceText));
     }
 
     public void AddImagePanel (BitmapSource bmpSource, Uri sourceUri)
     {
-        this._stackPanel.Children.Add(new ImagePanel(bmpSource, sourceUri));
+        this._stackPanel.AddChild(new ImagePanel(bmpSource, sourceUri));
     }
 
     private void SetWindowLocation()
@@ -133,15 +133,21 @@ public class MainWindow : System.Windows.Window
 #region Paint
 public class Paint
 {
+    public static Color BackgroundColor = new Color{A =255, R =30, G = 30, B =30};
+    public static Brush BackgroundBrush = new SolidColorBrush(BackgroundColor);
+
     public static Brush ForegroundBrush = new SolidColorBrush(Colors.WhiteSmoke);
+
+    public static Brush BlueBrush = new SolidColorBrush(Colors.Aqua);
+    public static Brush GrayBrush = new SolidColorBrush(Colors.Gray);
 
     public static Color MouseOverBackgroundColor = new Color {A = 255, R = 70, G = 70, B = 70};
     public static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
 
-    public static Color ButtonBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
+    public static Color ButtonBackgroundColor = new Color {A = 255, R = 55, G = 55, B = 55};
     public static Brush ButtonBackgroundBrush = new SolidColorBrush(ButtonBackgroundColor);
 
-    public static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 75, G = 75, B = 75};
+    public static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 85, G = 85, B = 85};
     public static Brush ButtonMouseOverBackgroundBrush = new SolidColorBrush(ButtonMouseOverBackgroundColor);
 
     public static Color ProgressedColor = new Color {A = 255, R = 25, G = 120, B = 235};
@@ -151,50 +157,6 @@ public class Paint
     public static Brush ProgressedMouseOverBrush = new SolidColorBrush(ProgressedMouseOverColor);
 }
 #endregion
-
-public class ProgressRect : INotifyPropertyChanged
-{
-    private Rect _progressRectProperty;
-
-    public ProgressRect() { }
-
-    public ProgressRect(Rect pRect)
-    {
-        this._progressRectProperty = pRect;
-    }
-
-    public ProgressRect(double pRx, double pRy, double pRWidth, double pRHeight)
-    {
-        this._progressRectProperty = new Rect(pRx, pRy, pRWidth, pRHeight);
-    }
-
-    public Rect ProgressRectProperty
-    {
-        get { return _progressRectProperty; }
-        set
-        {
-            this._progressRectProperty = value;
-            OnPropertyChanged("ProgressRectProperty");
-        }
-    }
-
-    public void SetProgress(double pRWidth)
-    {
-        this._progressRectProperty.Width = pRWidth;
-        OnPropertyChanged("ProgressRectProperty");
-    }
-
-    public event PropertyChangedEventHandler PropertyChanged;
-
-    private void OnPropertyChanged(string info)
-    {
-        PropertyChangedEventHandler handler = PropertyChanged;
-        if (handler != null)
-        {
-            handler(this, new PropertyChangedEventArgs(info));
-        }
-    }
-}
 
 public class CustomButton : System.Windows.Controls.Primitives.ButtonBase
 {
@@ -229,7 +191,6 @@ public class CustomButton : System.Windows.Controls.Primitives.ButtonBase
         };
         this._grid.Children.Add(this._backgroundRect);
         this._grid.Children.Add(this._textBlock);
-        //this._backgroundbrush = new LinearGradientBrush(Paint.ProgressedColor, Paint.ButtonBackgroundColor, _progressPoint, _progressPoint);
 
         this.Content = this._grid;
         this.MouseEnter += new MouseEventHandler(CustomButton_MouseEnter);
@@ -259,6 +220,76 @@ public class CustomButton : System.Windows.Controls.Primitives.ButtonBase
     }
 }
 
+class TileButton : System.Windows.Controls.Primitives.ButtonBase
+{
+    private Border _border;
+    private TextBlock _textBlock;
+    public string IconText
+    {
+        get {
+            if (null == this._textBlock)
+                return String.Empty;
+            else
+                return this._textBlock.Text;
+        }
+        set { this._textBlock.Text = value; }
+    }
+    public Brush IconBrush
+    {
+        get {
+            if (null == this._textBlock)
+                return null;
+            else
+                return this._textBlock.Foreground;
+        }
+        set { this._textBlock.Foreground = value; }
+    }
+
+    public TileButton(string iconText)
+    {
+        this._textBlock = new TextBlock{
+            Width = 17.5,
+            Height = 17.5,
+            FontSize =17.5,
+            TextAlignment = TextAlignment.Center,
+            //FontWeight = FontWeights.UltraBold,
+            Foreground = Paint.ForegroundBrush,
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            Text = iconText
+        };
+
+        this._border = new Border{
+            Width = 25.0,
+            Height = 25.0,
+            VerticalAlignment = VerticalAlignment.Top,
+            CornerRadius = new CornerRadius(5.0),
+            Background = Brushes.Transparent
+        };
+        this._border.Child = this._textBlock;
+
+        this.Content = this._border;
+        this.Margin = new Thickness(0.0, 7.5, 7.5, 0.0);
+        this.MouseEnter += new MouseEventHandler(TileButton_MouseEnter);
+        this.MouseLeave += new MouseEventHandler(TileButton_MouseLeave);
+    }
+
+    void TileButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        this._border.Background = Paint.MouseOverBackgroundBrush;
+    }
+
+    void TileButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        this._border.Background = Brushes.Transparent;
+    }
+}
+
+class CustomUIElementCollection : UIElementCollection
+{
+    public CustomUIElementCollection (System.Windows.UIElement visualParent, System.Windows.FrameworkElement logicalParent) : base(visualParent, logicalParent) {
+    }
+}
+
 #region Panel
 class MainStackPanel : StackPanel
 {
@@ -268,6 +299,57 @@ class MainStackPanel : StackPanel
     {
         RenderSizeChanged.Invoke(this, EventArgs.Empty);
     }
+
+    public void PinChildAt(int index)
+    {
+        if (this.Children.Count - 1 == index)
+            return;
+
+        for (int i = this.Children.Count - 1; i > index; i--)
+        {
+            if (false == ((CustomPanel)this.Children[i]).IsPinned)
+            {
+                UIElement e = this.Children[index] as UIElement;
+                if (this.Children.Count - 1 == i) {
+                    this.Children.RemoveAt(index);
+                    this.Children.Add(e);
+                } else {
+                    this.Children.RemoveAt(index);
+                    this.Children.Insert(i, e);
+                }
+                break;
+            }
+        }
+    }
+
+    public void UnpinChildAt(int index)
+    {
+        for (int i = 0; i < index; i++)
+        {
+            if (true == ((CustomPanel)this.Children[i]).IsPinned)
+            {
+                UIElement e = this.Children[index] as UIElement;
+                if (i < index) {
+                    this.Children.RemoveAt(index);
+                    this.Children.Insert(i, e);
+                }
+                break;
+            }
+        }
+    }
+
+    public void AddChild(UIElement e)
+    {
+        for (int i = 0; i < this.Children.Count; i++)
+        {
+            if (true == ((CustomPanel)this.Children[i]).IsPinned)
+            {
+                this.Children.Insert(i, e);
+                return;
+            }
+        }
+        this.Children.Add(e);
+    }
 }
 
 abstract class CustomPanel : Grid, IDisposable
@@ -276,8 +358,10 @@ abstract class CustomPanel : Grid, IDisposable
     protected static FontFamily IconFont = new FontFamily("Segoe MDL2 Assets");
 
     protected string IconText = "\uF0E3";
+    public bool IsPinned = false;
 
-    protected Button _closeButton;
+    protected TileButton _closeButton;
+    protected TileButton _pinButton;
     protected CustomButton _copyButton;
     protected TextBlock _sourceTextBegin;
     protected TextBlock _sourceTextEnd;
@@ -290,8 +374,8 @@ abstract class CustomPanel : Grid, IDisposable
     public CustomPanel()
     {
         this.HorizontalAlignment = HorizontalAlignment.Stretch;
-        this.Margin = new Thickness{Top = 15.0};
-        this.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
+        this.Margin = new Thickness{Top = 15.0, Left = 15.0, Right = 15.0};
+        this.Background = Paint.BackgroundBrush;
         this.Effect = new DropShadowEffect
         {
             Color = Colors.Black,
@@ -299,11 +383,11 @@ abstract class CustomPanel : Grid, IDisposable
             ShadowDepth = 0,
             Opacity = 0.65
         };
+        this.RowDefinitions.Add(new RowDefinition{MinHeight = 40.0});
         this.RowDefinitions.Add(new RowDefinition{MinHeight = 35.0});
-        this.RowDefinitions.Add(new RowDefinition{MinHeight = 35.0});
+        this.RowDefinitions.Add(new RowDefinition{MinHeight = 40.0});
         this.ColumnDefinitions.Add(new ColumnDefinition{MinWidth = 35.0, Width = GridLength.Auto});
         this.ColumnDefinitions.Add(new ColumnDefinition{Width = new GridLength(1.0, GridUnitType.Star)});
-        this.ColumnDefinitions.Add(new ColumnDefinition{MinWidth = 35.0, Width = GridLength.Auto});
     }
 
     protected void InitializeChildren()
@@ -313,23 +397,33 @@ abstract class CustomPanel : Grid, IDisposable
             Text = IconText,
             FontSize = 20.0,
             Foreground = Paint.ForegroundBrush,
-            Margin = new Thickness(10.0, 10.0, 5.0, 0.0)
+            Margin = new Thickness(10.0, 10.0, 5.0, 0.0),
+
         };
-        SetColumn(textIcon, 0);
-        this._closeButton = new Button{
-            Style = CloseButtonStyle()
+
+        StackPanel tileButtonStack = new StackPanel{
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right
         };
+
+        this._closeButton = new TileButton("\uEDAE");
         this._closeButton.Click += new RoutedEventHandler(CloseButton_Click);
-        SetColumn(this._closeButton, 2);
 
-        this._copyButton = new CustomButton("Copy");
-        this._copyButton.Click += new RoutedEventHandler(CopyButton_Click);
+        this._pinButton = new TileButton("\uE840");
+        this._pinButton.Click += new RoutedEventHandler(PinButton_Click);
 
-        this._bottomDock = new DockPanel{
-            LastChildFill = false
-        };
-        SetRow(this._bottomDock, 1);
-        SetColumnSpan(this._bottomDock, 3);
+        tileButtonStack.Children.Add(this._pinButton);
+            tileButtonStack.Children.Add(this._closeButton);
+            SetColumn(tileButtonStack, 1);
+
+            this._copyButton = new CustomButton("Copy");
+            this._copyButton.Click += new RoutedEventHandler(CopyButton_Click);
+
+            this._bottomDock = new DockPanel{
+                LastChildFill = false
+            };
+            SetRow(this._bottomDock, 2);
+        SetColumnSpan(this._bottomDock, 2);
 
         this._buttonStack = new StackPanel{
             Orientation = Orientation.Horizontal,
@@ -365,94 +459,59 @@ abstract class CustomPanel : Grid, IDisposable
         this._bottomDock.Children.Add(this._buttonStack);
         this._bottomDock.Children.Add(this._textDock);
 
-
         this.Children.Add(textIcon);
-        this.Children.Add(this._closeButton);
+        this.Children.Add(tileButtonStack);
         this.Children.Add(this._bottomDock);
     }
 
-    private void CloseButton_Click (object sender, RoutedEventArgs e)
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
-        Dispose();
+        if (false == this.IsPinned)
+            Dispose();
     }
 
-    private static Style CloseButtonStyle()
+    protected void PinButton_Click(object sender, RoutedEventArgs e)
     {
-        FrameworkElementFactory tb = new FrameworkElementFactory(typeof(TextBlock));
-        tb.SetValue(TextBlock.WidthProperty, 15.0);
-        tb.SetValue(TextBlock.HeightProperty, 15.0);
-        tb.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
-        tb.SetValue(TextBlock.FontSizeProperty, 15.0);
-        tb.SetValue(TextBlock.FontWeightProperty, FontWeights.UltraBold);
-        tb.SetValue(TextBlock.ForegroundProperty, Paint.ForegroundBrush);
-        tb.SetValue(TextBlock.FontFamilyProperty, new FontFamily("Segoe MDL2 Assets"));
-        tb.SetValue(TextBlock.TextProperty, "\uE10A");
+        if (this.IsPinned) {
+            this.IsPinned = false;
+            this._pinButton.IconText = "\uE840";
+            this._pinButton.IconBrush = Paint.ForegroundBrush;
+            this._closeButton.IconBrush = Paint.ForegroundBrush;
+            int index = ((StackPanel)this.Parent).Children.IndexOf((UIElement)this);
+            ((MainStackPanel)this.Parent).UnpinChildAt(index);
+        } else {
+            this.IsPinned = true;
+            this._pinButton.IconText = "\uE141";
+            this._pinButton.IconBrush = Paint.BlueBrush;
+            this._closeButton.IconBrush = Paint.GrayBrush;
+            int index = ((StackPanel)this.Parent).Children.IndexOf((UIElement)this);
+            ((MainStackPanel)this.Parent).PinChildAt(index);
+        }
+        /*Console.WriteLine(((StackPanel)this.Parent).Children.Count);
+            for (int i = 0; i < ((StackPanel)this.Parent).Children.Count; i++)
+            {
+                if (false == ((CustomPanel)((StackPanel)this.Parent).Children[i]).IsPinned) {
 
-        FrameworkElementFactory factory = new FrameworkElementFactory(typeof(Border));
-        factory.Name = "border";
-        factory.SetValue(Border.WidthProperty, 25.0);
-        factory.SetValue(Border.HeightProperty, 25.0);
-        factory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
-        factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
-        factory.AppendChild(tb);
-        ControlTemplate ct = new ControlTemplate(typeof(Button));
-        ct.VisualTree = factory;
-
-        Trigger mouseOverTrigger = new Trigger();
-        mouseOverTrigger.Property = Button.IsMouseOverProperty;
-        mouseOverTrigger.Value = true;
-        mouseOverTrigger.Setters.Add(new Setter{
-            TargetName = "border",
-            Property = Border.BackgroundProperty,
-            Value = Paint.MouseOverBackgroundBrush
-        });
-
-        ct.Triggers.Add(mouseOverTrigger);
-        Style style = new Style(typeof(Button));
-        style.Setters.Add(new Setter(Button.TemplateProperty, ct));
-        style.Setters.Add(new Setter(Button.MarginProperty, new Thickness(7.5)));
-        return style;
+                }
+            }*/
     }
 
-    protected static Style ActionButtonStyle(string caption)
+    protected void PinButton_MouseEnter(object sender, MouseEventArgs e)
     {
-        FrameworkElementFactory tb = new FrameworkElementFactory(typeof(TextBlock));
-        tb.SetValue(TextBlock.PaddingProperty, new Thickness(15.0, 5.0, 15.0, 5.0));
-        tb.SetValue(TextBlock.FontSizeProperty, 14.0);
-        tb.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
-        tb.SetValue(TextBlock.ForegroundProperty, Paint.ForegroundBrush);
-        tb.SetValue(TextBlock.TextProperty, caption);
+        if (this.IsPinned) {
+            this._pinButton.IconText = "\uE196";
+        } else {
+            this._pinButton.IconText = "\uE141";
+        }
+    }
 
-        FrameworkElementFactory factory = new FrameworkElementFactory(typeof(Border));
-        factory.Name = "border";
-        factory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
-        factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
-        factory.SetValue(Border.BackgroundProperty, Paint.ButtonBackgroundBrush);
-        factory.AppendChild(tb);
-
-        MultiTrigger mouseOverTrigger = new MultiTrigger();
-        mouseOverTrigger.Conditions.Add(new Condition{
-            Property = Border.IsMouseOverProperty,
-            Value = true
-        });
-        mouseOverTrigger.Conditions.Add(new Condition{
-            Property = Border.IsMouseCapturedProperty,
-            Value = false
-        });
-        mouseOverTrigger.Setters.Add(new Setter{
-            TargetName = "border",
-            Property = Border.BackgroundProperty,
-            Value = Paint.ButtonMouseOverBackgroundBrush
-        });
-
-        ControlTemplate ct = new ControlTemplate(typeof(Button));
-        ct.VisualTree = factory;
-        ct.Triggers.Add(mouseOverTrigger);
-
-        Style style = new Style(typeof(Button));
-        style.Setters.Add(new Setter(Button.TemplateProperty, ct));
-        style.Setters.Add(new Setter(Button.MarginProperty, new Thickness{Left = 15.0, Bottom = 15.0})); //FlowDirection.RightToLeftの為 Leftマージンを設定
-        return style;
+    protected void PinButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (this.IsPinned) {
+            this._pinButton.IconText = "\uE141";
+        } else {
+            this._pinButton.IconText = "\uE840";
+        }
     }
 
     protected Window GetWindowObject()
@@ -508,6 +567,7 @@ class TextPanel : CustomPanel
             Margin = new Thickness(5.0)
         };
         SetColumn(textContent, 1);
+        SetRow(textContent, 1);
         this.Children.Add(textContent);
     }
 
@@ -518,7 +578,6 @@ class TextPanel : CustomPanel
             dataObj.SetText(this._text);
             Clipboard.SetDataObject(dataObj);
             this.Dispose();
-
         } catch { }
     }
 }
@@ -528,10 +587,10 @@ class HyperlinkPanel : CustomPanel
 {
     private string _urlString;
     private string _savedFilePath;
-    private Button _downloadButton;
+    private CustomButton _downloadButton;
     private CustomButton _cancelButton;
     private CustomButton _openButton;
-    private Button _openFolderButton;
+    private CustomButton _openFolderButton;
     private System.Windows.Shapes.Rectangle _progressRect;
     private RectangleGeometry _progressClip = new RectangleGeometry();
     private Rect _progressClipRect = new Rect(0.0, 0.0, 0.0, 0.0);
@@ -570,13 +629,10 @@ class HyperlinkPanel : CustomPanel
         SetColumn(outerTextBlock, 1);
         this.Children.Add(outerTextBlock);
 
-        this._downloadButton = new Button{
-            Style = ActionButtonStyle("Download")
-        };
+        this._downloadButton = new CustomButton("Download");
         this._downloadButton.Click += new RoutedEventHandler(DownloadButton_Click);
 
         this._cancelButton = new CustomButton("Cancel");
-
         this._progressClip.Rect = this._progressClipRect;
         this._progressRect = new System.Windows.Shapes.Rectangle{
             RadiusX = 5.0,
@@ -593,9 +649,7 @@ class HyperlinkPanel : CustomPanel
         this._openButton.SetBackground(Paint.ProgressedBrush, Paint.ProgressedMouseOverBrush);
         this._openButton.Click += new RoutedEventHandler(OpenButton_Click);
 
-        this._openFolderButton = new Button{
-            Style = ActionButtonStyle("Open Folder"),
-        };
+        this._openFolderButton = new CustomButton("Open");
         this._openFolderButton.Click += new RoutedEventHandler(OpenFolderButton_Click);
 
         this._buttonStack.Children.Add(this._downloadButton);
@@ -630,7 +684,6 @@ class HyperlinkPanel : CustomPanel
             dataObj.SetText(this._urlString);
             Clipboard.SetDataObject(dataObj);
             this.Dispose();
-
         } catch { }
     }
 
@@ -655,16 +708,6 @@ class HyperlinkPanel : CustomPanel
 
         this._buttonStack.Children.Remove(this._downloadButton);
         this._buttonStack.Children.Add(this._cancelButton);
-        /*
-        try {
-            this._htttpClnt.DownloadProgressChanged += new DownloadProgressChangedEventHandler(
-                DownloadProgressChangedCallback);
-            this._htttpClnt.DownloadFileCompleted += new AsyncCompletedEventHandler(DownloadFileCallback);
-            this._htttpClnt.GetAsync(new Uri(this._urlString), dialog.FileName, dialog.FileName);
-        } catch {
-            this._buttonStack.Children.Remove(this._cancelButton);
-            this._buttonStack.Children.Add(this._downloadButton);
-        }*/
         
         using (var request  = new HttpRequestMessage(HttpMethod.Get, new Uri(this._urlString)))
         using (var response = await Http.Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
@@ -762,39 +805,6 @@ class HyperlinkPanel : CustomPanel
 
         Process.Start("explorer.exe", String.Format("/select,\"{0}\"", this._savedFilePath));
     }
-
-    protected void DownloadFileCallback(object sender, AsyncCompletedEventArgs e)
-    {
-        Console.WriteLine(e.UserState);
-
-        if (e.Cancelled || null != e.Error) {
-            Console.WriteLine("Download Cancelled");
-            this._buttonStack.Children.Remove(this._cancelButton);
-            this._buttonStack.Children.Add(this._downloadButton);
-        } else {
-            Console.WriteLine("Download Completed");
-            this._savedFilePath = (string)e.UserState;
-            this._buttonStack.Children.Remove(this._cancelButton);
-            this._buttonStack.Children.Add(this._openButton);
-            this._buttonStack.Children.Add(this._openFolderButton);
-            var fi = new FileInfo(this._savedFilePath);
-            if (fi.Exists) {
-                this._sourceTextBegin.Text = String.Format("{0} - ", fi.Name);
-                this._sourceTextEnd.Text = String.Format("{0}KB", (fi.Length / 1024));
-            }
-        }
-
-        //this._htttpClnt.Dispose();
-    }
-
-    /*
-    protected void DownloadProgressChangedCallback(object sender, DownloadProgressChangedEventArgs e)
-    {
-        this._progressClipRect.Width = (this._progressRect.ActualWidth * (e.ProgressPercentage / 100.0));
-        this._progressClipRect.Height = this._progressRect.ActualHeight;
-        this._progressClip.Rect = this._progressClipRect;
-        this._progressRect.Clip = this._progressClip;
-    }*/
 }
 #endregion
 
@@ -834,9 +844,7 @@ class ImagePanel : CustomPanel
         SetColumn(imageContent, 1);
         this.Children.Add(imageContent);
 
-        Button saveButton = new Button{
-            Style = ActionButtonStyle("Save")
-        };
+        CustomButton saveButton = new CustomButton("Save");
         saveButton.Click += new RoutedEventHandler(SaveButton_Click);
         this._buttonStack.Children.Add(saveButton);
     }
