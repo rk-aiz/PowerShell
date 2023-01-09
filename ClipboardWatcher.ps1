@@ -627,6 +627,7 @@ class HyperlinkPanel : CustomPanel
             Margin = new Thickness(5.0)
         };
         SetColumn(outerTextBlock, 1);
+        SetRow(outerTextBlock, 1);
         this.Children.Add(outerTextBlock);
 
         this._downloadButton = new CustomButton("Download");
@@ -842,6 +843,7 @@ class ImagePanel : CustomPanel
             HorizontalAlignment = HorizontalAlignment.Left
         };
         SetColumn(imageContent, 1);
+        SetRow(imageContent, 1);
         this.Children.Add(imageContent);
 
         CustomButton saveButton = new CustomButton("Save");
