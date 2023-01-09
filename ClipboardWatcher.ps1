@@ -195,6 +195,8 @@ public class CustomButton : System.Windows.Controls.Primitives.ButtonBase
         this.Content = this._grid;
         this.MouseEnter += new MouseEventHandler(CustomButton_MouseEnter);
         this.MouseLeave += new MouseEventHandler(CustomButton_MouseLeave);
+        this.PreviewMouseLeftButtonDown += new MouseButtonEventHandler(CustomButton_MouseLeftButtonDown);
+        this.PreviewMouseLeftButtonUp += new MouseButtonEventHandler(CustomButton_MouseLeftButtonUp);
     }
 
     public void SetBackground(Brush background, Brush mouseover)
@@ -217,6 +219,16 @@ public class CustomButton : System.Windows.Controls.Primitives.ButtonBase
     private void CustomButton_MouseLeave(object sender, MouseEventArgs e)
     {
         this._backgroundRect.Fill = this._backgroundBrush;
+    }
+
+    private void CustomButton_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        this._backgroundRect.Fill = this._backgroundBrush;
+    }
+
+    private void CustomButton_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        this._backgroundRect.Fill = this._mouseOverBackgroundBrush;
     }
 }
 
@@ -397,8 +409,7 @@ abstract class CustomPanel : Grid, IDisposable
             Text = IconText,
             FontSize = 20.0,
             Foreground = Paint.ForegroundBrush,
-            Margin = new Thickness(10.0, 10.0, 5.0, 0.0),
-
+            Margin = new Thickness(10.0, 10.0, 5.0, 0.0)
         };
 
         StackPanel tileButtonStack = new StackPanel{
@@ -413,16 +424,16 @@ abstract class CustomPanel : Grid, IDisposable
         this._pinButton.Click += new RoutedEventHandler(PinButton_Click);
 
         tileButtonStack.Children.Add(this._pinButton);
-            tileButtonStack.Children.Add(this._closeButton);
-            SetColumn(tileButtonStack, 1);
+        tileButtonStack.Children.Add(this._closeButton);
+        SetColumn(tileButtonStack, 1);
 
-            this._copyButton = new CustomButton("Copy");
-            this._copyButton.Click += new RoutedEventHandler(CopyButton_Click);
+        this._copyButton = new CustomButton("Copy");
+        this._copyButton.Click += new RoutedEventHandler(CopyButton_Click);
 
-            this._bottomDock = new DockPanel{
-                LastChildFill = false
-            };
-            SetRow(this._bottomDock, 2);
+        this._bottomDock = new DockPanel{
+            LastChildFill = false
+        };
+        SetRow(this._bottomDock, 2);
         SetColumnSpan(this._bottomDock, 2);
 
         this._buttonStack = new StackPanel{
@@ -487,13 +498,6 @@ abstract class CustomPanel : Grid, IDisposable
             int index = ((StackPanel)this.Parent).Children.IndexOf((UIElement)this);
             ((MainStackPanel)this.Parent).PinChildAt(index);
         }
-        /*Console.WriteLine(((StackPanel)this.Parent).Children.Count);
-            for (int i = 0; i < ((StackPanel)this.Parent).Children.Count; i++)
-            {
-                if (false == ((CustomPanel)((StackPanel)this.Parent).Children[i]).IsPinned) {
-
-                }
-            }*/
     }
 
     protected void PinButton_MouseEnter(object sender, MouseEventArgs e)
@@ -574,10 +578,9 @@ class TextPanel : CustomPanel
     protected override void CopyButton_Click (object sender, RoutedEventArgs e)
     {
         try {
-            DataObject dataObj = new DataObject();
+            DataObject dataObj = new DataObject("ClipboardWatcherData", true);
             dataObj.SetText(this._text);
             Clipboard.SetDataObject(dataObj);
-            this.Dispose();
         } catch { }
     }
 }
@@ -681,10 +684,9 @@ class HyperlinkPanel : CustomPanel
     protected override void CopyButton_Click (object sender, RoutedEventArgs e)
     {
         try {
-            DataObject dataObj = new DataObject();
+            DataObject dataObj = new DataObject("ClipboardWatcherData", true);
             dataObj.SetText(this._urlString);
             Clipboard.SetDataObject(dataObj);
-            this.Dispose();
         } catch { }
     }
 
@@ -854,10 +856,9 @@ class ImagePanel : CustomPanel
     protected override void CopyButton_Click (object sender, RoutedEventArgs e)
     {
         try {
-            DataObject dataObj = new DataObject();
+            DataObject dataObj = new DataObject("ClipboardWatcherData", true);
             dataObj.SetImage(this._bmpSource);
             Clipboard.SetDataObject(dataObj);
-            this.Dispose();
         } catch { }
     }
 
@@ -1101,7 +1102,7 @@ function Program
 
         $dataObj = [Clipboard]::GetDataObject()
 
-        if ($null -eq $dataObj) {
+        if (($null -eq $dataObj) -or ($true -eq $dataObj.GetData('ClipboardWatcherData'))) {
             return
         }
         Write-Debug ($dataObj.GetFormats() -join ' ')
