@@ -649,7 +649,7 @@ class HyperlinkPanel : CustomPanel
         this._openButton.SetBackground(Paint.ProgressedBrush, Paint.ProgressedMouseOverBrush);
         this._openButton.Click += new RoutedEventHandler(OpenButton_Click);
 
-        this._openFolderButton = new CustomButton("Open");
+        this._openFolderButton = new CustomButton("Open Folder");
         this._openFolderButton.Click += new RoutedEventHandler(OpenFolderButton_Click);
 
         this._buttonStack.Children.Add(this._downloadButton);
