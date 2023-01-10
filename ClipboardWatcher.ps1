@@ -1353,6 +1353,7 @@ function Program
     $ClipBoardWatcher = New-Object ClipboardWatcher
 
     $MainWindow = New-Object MainWindow
+    [OptionWindow]$OptionWindow = $null
 
     $alwaysTopStripItem = New-Object System.Windows.Forms.ToolStripMenuItem('Always on Top', $null, {
         Param($s, $e)
@@ -1381,8 +1382,14 @@ function Program
 
     $optionStripItem = New-Object System.Windows.Forms.ToolStripMenuItem('Option', $null, {
         Param($s, $e)
-        $OptionWindow = New-Object OptionWindow $MainWindow
-        $OptionWindow.ShowDialog()
+        if ($null -ne $OptionWindow) { return }
+
+        try {
+            $OptionWindow = New-Object OptionWindow $MainWindow
+            $OptionWindow.ShowDialog()
+        } finally {
+            $OptionWindow = $null
+        }
     })
     $ClipBoardWatcher.AddToolStripItem($optionStripItem)
 
