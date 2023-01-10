@@ -7,9 +7,9 @@ using namespace System.Text
 
 Param(
     [Parameter()]
-    [switch] $Disable,
-    [Parameter()]
     [switch] $ShowConsole,
+    [Parameter()]
+    [switch] $AlwaysOnTop,
     [Parameter()]
     [switch] $UserDebug
 )
@@ -17,12 +17,12 @@ Param(
 if ($ShowConsole -eq $false)
 {
     #自身のps1をウィンドウ無しで再実行する
-    $strDisable = $(if ($Disable) {'-Disable '} else {''})
+    $strAlwaysOnTop = $(if ($AlwaysOnTop) {'-AlwaysOnTop '} else {''})
     $StartInfo = New-Object Diagnostics.ProcessStartInfo
     $StartInfo.UseShellExecute = $false
     $StartInfo.CreateNoWindow = $true
     $StartInfo.FileName = "powershell.exe"
-    $StartInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Unrestricted -File "{0}" -ShowConsole {1}' -f $MyInvocation.MyCommand.Path, $strDisable
+    $StartInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Unrestricted -File "{0}" -ShowConsole {1}' -f $MyInvocation.MyCommand.Path, $strAlwaysOnTop
     $Process = New-Object Diagnostics.Process
     $Process.StartInfo = $StartInfo
     $null = $Process.Start()
@@ -1344,7 +1344,8 @@ function Program
 {
     Param(
         [Parameter()]
-        [bool] $Disable = $false
+        [bool] $AlwaysOnTop = $false
+        
     )
 
     $UrlRegEx = New-Object RegEx $global:UrlRegExStr
@@ -1352,7 +1353,6 @@ function Program
     $ClipBoardWatcher = New-Object ClipboardWatcher
 
     $MainWindow = New-Object MainWindow
-    $MainWindow.Show()
 
     $alwaysTopStripItem = New-Object System.Windows.Forms.ToolStripMenuItem('Always on Top', $null, {
         Param($s, $e)
@@ -1370,6 +1370,13 @@ function Program
             }
         }
     })
+
+    if ($true -eq $AlwaysOnTop)
+    {
+        $alwaysTopStripItem.Checked = $true
+        $MainWindow.Topmost = $true
+    }
+
     $ClipBoardWatcher.AddToolStripItem($alwaysTopStripItem)
 
     $optionStripItem = New-Object System.Windows.Forms.ToolStripMenuItem('Option', $null, {
@@ -1379,10 +1386,7 @@ function Program
     })
     $ClipBoardWatcher.AddToolStripItem($optionStripItem)
 
-    if ($false -eq $Disable)
-    {
-        $ClipBoardWatcher.Start()
-    }
+    $ClipBoardWatcher.Start()
 
     $ClipBoardWatcher.add_ClipboardChanged(
     {
@@ -1446,6 +1450,7 @@ function Program
         }
     })
 
+    $MainWindow.Show()
     [Windows.Forms.Application]::Run($appContext)
     $ClipBoardWatcher.Stop()
     $MainWindow.Close()
@@ -1456,7 +1461,7 @@ function Program
 $mutexObj = New-Object Threading.Mutex($false, ('Global\{0}' -f $MyInvocation.MyCommand.Name))
 
 if ($mutexObj.WaitOne(0, $false)) {
-    Program -Disable $Disable
+    Program -AlwaysOnTop $AlwaysOnTop
     $mutexObj.ReleaseMutex()
 }
 
