@@ -567,7 +567,7 @@ class TextPanel : CustomPanel
 
     private void InitializeComponent()
     {
-        this.IconText = "\uF000";
+        this.IconText = "\uE1A2";
         InitializeChildren();
 
         TextBox textContent = new TextBox
@@ -969,6 +969,8 @@ class FileListPanel : CustomPanel
             ItemsSource = this._fileInfoCollection,
             ItemTemplate = CreateDataTemplate()
         };
+        this._listBox.AddHandler(ListBoxItem.PreviewMouseDoubleClickEvent, new MouseButtonEventHandler(ListBoxItem_DoubleClick));
+
         SetColumn(this._listBox, 1);
         SetRow(this._listBox, 1);
         this.Children.Add(this._listBox);
@@ -976,6 +978,15 @@ class FileListPanel : CustomPanel
         var openFolderButton = new CustomButton("Open Folder");
         openFolderButton.Click += new RoutedEventHandler(OpenFolderButton_Click);
         this._buttonStack.Children.Add(openFolderButton);
+    }
+
+    private void ListBoxItem_DoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        try {
+            var path = ((FileSystemData)((FrameworkElement)e.OriginalSource).DataContext).FilePathProperty;
+            if (null != path && (Directory.Exists(path) || File.Exists(path)))
+                Process.Start(path);
+        } catch { }
     }
 
     private DataTemplate CreateDataTemplate()
@@ -1173,10 +1184,14 @@ public class ClipBoardWatcher : System.Windows.Forms.Form
         base.Close();
     }
 
+    public void AddToolStripItem(ToolStripItem item)
+    {
+        this._notifyIcon.ContextMenuStrip.Items.Insert(0, item);
+    }
+
     private ContextMenuStrip InitializeMenuStrip()
     {
         var menuStrip  = new ContextMenuStrip();
-        //menu.Items.Add("各種設定", null, (s, e) => { ShowMainWindow(); });
         menuStrip.Items.Add("Exit", null, (s, e) => { System.Windows.Forms.Application.ExitThread(); });
         return menuStrip;
     }
@@ -1257,10 +1272,29 @@ function Program
     )
 
     $UrlRegEx = New-Object RegEx $global:UrlRegExStr
-    $appContext = New-Object Windows.Forms.ApplicationContext
+    $appContext = New-Object System.Windows.Forms.ApplicationContext
     $ClipBoardWatcher = New-Object ClipboardWatcher
+
     $MainWindow = New-Object MainWindow
     $MainWindow.Show()
+
+    $alwaysTopStripItem = New-Object System.Windows.Forms.ToolStripMenuItem('Always on Top', $null, {
+        Param($s, $e)
+        if ($null -ne $MainWindow)
+        {
+            if ($s.Checked)
+            {
+                $s.Checked = $false
+                $MainWindow.Topmost = $false
+            }
+            else
+            {
+                $s.Checked = $true
+                $MainWindow.Topmost = $true
+            }
+        }
+    })
+    $ClipBoardWatcher.AddToolStripItem($alwaysTopStripItem)
 
     if ($false -eq $Disable)
     {
