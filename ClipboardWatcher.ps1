@@ -41,6 +41,7 @@ using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
@@ -54,6 +55,8 @@ using System.Configuration;
 using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.ComponentModel;
+using System.Collections.Specialized;
+using System.Collections.ObjectModel;
 
 #region MainWindow
 public class MainWindow : System.Windows.Window
@@ -89,24 +92,29 @@ public class MainWindow : System.Windows.Window
         base.OnClosing(e);
     }
 
-    public void AddTextPanel (string text, string sourceText)
+    public void AddTextPanel(string text, string sourceText)
     {
         this._stackPanel.AddChild(new TextPanel(text, sourceText));
     }
 
-    public void AddHyperlinkPanel (string text, string sourceText)
+    public void AddHyperlinkPanel(string text, string sourceText)
     {
         this._stackPanel.AddChild(new HyperlinkPanel(text, sourceText));
     }
 
-    public void AddImagePanel (BitmapSource bmpSource, string sourceText)
+    public void AddImagePanel(BitmapSource bmpSource, string sourceText)
     {
         this._stackPanel.AddChild(new ImagePanel(bmpSource, sourceText));
     }
 
-    public void AddImagePanel (BitmapSource bmpSource, Uri sourceUri)
+    public void AddImagePanel(BitmapSource bmpSource, Uri sourceUri)
     {
         this._stackPanel.AddChild(new ImagePanel(bmpSource, sourceUri));
+    }
+
+    public void AddFileListPanel(StringCollection fileList, string sourceText)
+    {
+        this._stackPanel.AddChild(new FileListPanel(fileList, sourceText));
     }
 
     private void SetWindowLocation()
@@ -155,6 +163,8 @@ public class Paint
 
     public static Color ProgressedMouseOverColor = new Color {A = 255, R = 35, G = 145, B = 255};
     public static Brush ProgressedMouseOverBrush = new SolidColorBrush(ProgressedMouseOverColor);
+
+    public static FontFamily IconFontFamily = new FontFamily("Segoe MDL2 Assets");
 }
 #endregion
 
@@ -266,7 +276,7 @@ class TileButton : System.Windows.Controls.Primitives.ButtonBase
             TextAlignment = TextAlignment.Center,
             //FontWeight = FontWeights.UltraBold,
             Foreground = Paint.ForegroundBrush,
-            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontFamily = Paint.IconFontFamily,
             Text = iconText
         };
 
@@ -302,7 +312,7 @@ class CustomUIElementCollection : UIElementCollection
     }
 }
 
-#region Panel
+#region MainStackPanel
 class MainStackPanel : StackPanel
 {
     public event EventHandler RenderSizeChanged = (sender, e) => { };
@@ -363,12 +373,11 @@ class MainStackPanel : StackPanel
         this.Children.Add(e);
     }
 }
+#endregion MainStackPanel
 
+#region CustomPanel
 abstract class CustomPanel : Grid, IDisposable
 {
-
-    protected static FontFamily IconFont = new FontFamily("Segoe MDL2 Assets");
-
     protected string IconText = "\uF0E3";
     public bool IsPinned = false;
 
@@ -405,7 +414,7 @@ abstract class CustomPanel : Grid, IDisposable
     protected void InitializeChildren()
     {
         TextBlock textIcon = new TextBlock {
-            FontFamily = IconFont,
+            FontFamily = Paint.IconFontFamily,
             Text = IconText,
             FontSize = 20.0,
             Foreground = Paint.ForegroundBrush,
@@ -542,7 +551,9 @@ abstract class CustomPanel : Grid, IDisposable
         } catch { }
     }
 }
+#endregion CustomPanel
 
+#region TextPanel
 class TextPanel : CustomPanel
 {
     private string _text;
@@ -573,9 +584,13 @@ class TextPanel : CustomPanel
         SetColumn(textContent, 1);
         SetRow(textContent, 1);
         this.Children.Add(textContent);
+
+        CustomButton searchButton = new CustomButton("Search");
+        searchButton.Click += new RoutedEventHandler(SearchButton_Click);
+        this._buttonStack.Children.Add(searchButton);
     }
 
-    protected override void CopyButton_Click (object sender, RoutedEventArgs e)
+    protected override void CopyButton_Click(object sender, RoutedEventArgs e)
     {
         try {
             DataObject dataObj = new DataObject("ClipboardWatcherData", true);
@@ -583,7 +598,19 @@ class TextPanel : CustomPanel
             Clipboard.SetDataObject(dataObj);
         } catch { }
     }
+
+    private void SearchButton_Click(object sender, RoutedEventArgs e)
+    {
+        ProcessStartInfo psi = new ProcessStartInfo
+        {
+            FileName = String.Format("https://www.google.co.jp/search?q={0}", this._text),
+            UseShellExecute = true
+        };
+
+        Process.Start(psi);
+    }
 }
+#endregion TextPanel
 
 #region HyperlinkPanel
 class HyperlinkPanel : CustomPanel
@@ -809,8 +836,9 @@ class HyperlinkPanel : CustomPanel
         Process.Start("explorer.exe", String.Format("/select,\"{0}\"", this._savedFilePath));
     }
 }
-#endregion
+#endregion HyperlinkPanel
 
+#region ImagePanel
 class ImagePanel : CustomPanel
 {
     private BitmapSource _bmpSource;
@@ -892,7 +920,154 @@ class ImagePanel : CustomPanel
         }
     }
 }
-#endregion
+#endregion ImagePanel
+
+#region FileListPanel
+class FileListPanel : CustomPanel
+{
+    private StringCollection _fileList;
+    private ObservableCollection<FileSystemData> _fileInfoCollection = new ObservableCollection<FileSystemData>();
+    private ListBox _listBox;
+
+    public FileListPanel(StringCollection fileList, string sourceText)
+    {
+        this._fileList = fileList;
+        foreach (string fi in fileList)
+        {
+            if (File.Exists(fi)) {
+                FileSystemData data = new FileSystemData{
+                    IconTextProperty = "\uE132",
+                    FileNameProperty = Path.GetFileName(fi),
+                    FilePathProperty = fi,
+                    IsDirectoryProperty = false
+                };
+                this._fileInfoCollection.Add(data);
+            } else if (Directory.Exists(fi)) {
+                FileSystemData data = new FileSystemData{
+                    IconTextProperty = "\uF12B",
+                    FileNameProperty = Path.GetFileName(fi),
+                    FilePathProperty = fi,
+                    IsDirectoryProperty = true
+                };
+                this._fileInfoCollection.Add(data);
+            }
+        }
+        InitializeComponent();
+        this._sourceTextBegin.Text = sourceText;
+    }
+
+    private void InitializeComponent()
+    {
+        this.IconText = "\uE16F";
+        InitializeChildren();
+
+        this._listBox = new ListBox{
+            Background = Brushes.Transparent,
+            Foreground = Paint.ForegroundBrush,
+            FontSize = 17.0,
+            BorderThickness = new Thickness(0.0),
+            ItemsSource = this._fileInfoCollection,
+            ItemTemplate = CreateDataTemplate()
+        };
+        SetColumn(this._listBox, 1);
+        SetRow(this._listBox, 1);
+        this.Children.Add(this._listBox);
+
+        var openFolderButton = new CustomButton("Open Folder");
+        openFolderButton.Click += new RoutedEventHandler(OpenFolderButton_Click);
+        this._buttonStack.Children.Add(openFolderButton);
+    }
+
+    private DataTemplate CreateDataTemplate()
+    {
+        var iconText = new FrameworkElementFactory(typeof(TextBlock));
+        iconText.SetBinding(TextBlock.TextProperty, new Binding("IconTextProperty"));
+        iconText.SetValue(TextBlock.FontFamilyProperty, Paint.IconFontFamily);
+        iconText.SetValue(TextBlock.MarginProperty, new Thickness{Right = 10.0});
+
+        var textBlock = new FrameworkElementFactory(typeof(TextBlock));
+        textBlock.SetBinding(TextBlock.TextProperty, new Binding("FileNameProperty"));
+        
+        //上の2つを入れるStackPanel作成、スタック方向はHorizontal
+        var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
+        stackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        stackPanel.AppendChild(iconText);
+        stackPanel.AppendChild(textBlock);
+
+        //DataTemplate作成、VisualTreeに上のStackPanelを指定で完成
+        var template = new DataTemplate{
+            VisualTree = stackPanel
+        };
+        return template;
+    }
+
+    protected override void CopyButton_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            DataObject dataObj = new DataObject("ClipboardWatcherData", true);
+            dataObj.SetFileDropList(this._fileList);
+            Clipboard.SetDataObject(dataObj);
+        } catch { }
+    }
+
+    private void OpenFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            if (null == this._listBox.SelectedItem) {
+                Process.Start("explorer.exe", String.Format("/select,\"{0}\"", this._fileList[0]));
+            } else {
+                Process.Start("explorer.exe", String.Format("/select,\"{0}\"", ((FileSystemData)this._listBox.SelectedItem).FilePathProperty));
+            }
+        } catch { }
+    }
+
+}
+#endregion FileListPanel
+
+public class FileSystemData : INotifyPropertyChanged
+{
+    public string _iconTextProperty;
+    public string _fileNameProperty;
+    public string _filePathProperty;
+    public bool _isDirectoryProperty;
+
+    public FileSystemData() { }
+
+    public String IconTextProperty
+    {
+        get { return _iconTextProperty; }
+        set { _iconTextProperty = value; OnPropertyChanged("IconTextProperty"); }
+    }
+
+    public String FileNameProperty
+    {
+        get { return _fileNameProperty; }
+        set { _fileNameProperty = value; OnPropertyChanged("FileNameProperty"); }
+    }
+
+    public String FilePathProperty
+    {
+        get { return _filePathProperty; }
+        set { _filePathProperty = value; OnPropertyChanged("FilePathProperty"); }
+    }
+
+    public bool IsDirectoryProperty
+    {
+        get { return _isDirectoryProperty; }
+        set { _isDirectoryProperty = value; OnPropertyChanged("IsDirectoryProperty"); }
+    }
+
+    public event PropertyChangedEventHandler PropertyChanged;
+
+    private void OnPropertyChanged(string info)
+    {
+        PropertyChangedEventHandler handler = PropertyChanged;
+        if (handler != null)
+        {
+            handler(this, new PropertyChangedEventArgs(info));
+        }
+    }
+}
 
 class Http
 {
@@ -1134,8 +1309,11 @@ function Program
                     return
                 }
             }
-
             $MainWindow.AddImagePanel($dataObj.GetImage(), $sourceText)
+        }
+        elseif ($dataObj.ContainsFileDropList())
+        {
+            $MainWindow.AddFileListPanel($dataObj.GetFileDropList(), $sourceText)
         }
     })
 
