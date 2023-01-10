@@ -15,3 +15,11 @@ PowerShell練習用に作ったツール
 
 ・ClipboardWatcher.ps1
     - クリップボードに変更があった場合にスクリプトを実行するサンプル
+    
+    クリップボードの内容が以下の場合WPFでクリップボードの内容をパネル上に表示していく
+    ・テキスト (ContainsTrext)
+        -> URLの場合ハイパーリンクとして扱う
+    ・イメージ (ContainsImage)
+    ・ファイル (ContainsFileDropList)
+
+    PowerShellを通してでFormとWPFを連携するという変な実装
