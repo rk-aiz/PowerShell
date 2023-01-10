@@ -63,7 +63,10 @@ public class MainWindow : System.Windows.Window
 {
     private MainStackPanel _stackPanel = new MainStackPanel();
     private Rect _workArea = System.Windows.SystemParameters.WorkArea;
-    private int windowMargin = 25;
+    private int _windowMargin = 25;
+    public int WindowMargin{
+        get { return _windowMargin; }
+    }
 
     public MainWindow()
     {
@@ -80,7 +83,7 @@ public class MainWindow : System.Windows.Window
 
     private void MainStackPanel_RenderSizeChanged (object sender, EventArgs e)
     {
-        if (this.ActualHeight + windowMargin > _workArea.Height) {
+        if (this.ActualHeight + _windowMargin > _workArea.Height) {
             _stackPanel.Children.RemoveAt(0);
         } else {
             SetWindowLocation();
@@ -117,22 +120,22 @@ public class MainWindow : System.Windows.Window
         this._stackPanel.AddChild(new FileListPanel(fileList, sourceText));
     }
 
-    private void SetWindowLocation()
+    public void SetWindowLocation()
     {
         if (0 < _workArea.Left)
         {
-            this.Left = _workArea.Left + windowMargin;
-            this.Top = _workArea.Bottom - this.ActualHeight - windowMargin;
+            this.Left = _workArea.Left + _windowMargin;
+            this.Top = _workArea.Bottom - this.ActualHeight - _windowMargin;
         }
         else if (0 < _workArea.Top)
         {
-            this.Left = _workArea.Right - this.ActualWidth - windowMargin;
-            this.Top = _workArea.Top + windowMargin;
+            this.Left = _workArea.Right - this.ActualWidth - _windowMargin;
+            this.Top = _workArea.Top + _windowMargin;
         }
         else
         {
-            this.Left = _workArea.Right - this.ActualWidth - windowMargin;
-            this.Top = _workArea.Bottom - this.ActualHeight - windowMargin;
+            this.Left = _workArea.Right - this.ActualWidth - _windowMargin;
+            this.Top = _workArea.Bottom - this.ActualHeight - _windowMargin;
         }
     }
 }
@@ -1102,6 +1105,80 @@ class Http
     }
 }
 
+#region OptionWindow
+public class OptionWindow : Window
+{
+    private Slider _windowWidthSlider;
+    private StackPanel _stackPanel;
+
+    public OptionWindow(Window ownerWindow)
+    {
+        this.Owner = ownerWindow;
+        InitializeComponent();
+    }
+
+    private void InitializeComponent()
+    {
+        this.Title = "Option";
+        this.ShowActivated = true;
+        this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        this.SizeToContent = SizeToContent.WidthAndHeight;
+        this.WindowStyle = WindowStyle.ToolWindow;
+        this.Topmost = true;
+        InitializeChildren();
+    }
+
+    private void InitializeChildren()
+    {
+        this._windowWidthSlider = new Slider{
+            Orientation = Orientation.Horizontal,
+            Maximum = System.Windows.SystemParameters.WorkArea.Right,
+            TickFrequency = 1.0,
+            IsSnapToTickEnabled = true
+        };
+
+        if (null != this.Owner) {
+            this._windowWidthSlider.Value = this.Owner.ActualWidth;
+            this._windowWidthSlider.Maximum -= ((MainWindow)this.Owner).WindowMargin * 2;
+        }
+        
+        this._windowWidthSlider.ValueChanged += new RoutedPropertyChangedEventHandler<double>(WindowWidthSlider_PropertyChanged);
+
+        var windowWidthLabel = new TextBlock{
+            Text = "Width : "
+        };
+
+        Binding windowWidthBinding = new Binding("Value");
+        windowWidthBinding.Source = this._windowWidthSlider;
+
+        var windowWidthValue = new TextBlock();
+        windowWidthValue.SetBinding(TextBlock.TextProperty, windowWidthBinding);
+
+        this._stackPanel = new StackPanel{
+            Width = 480,
+            Margin = new Thickness(10.0)
+        };
+        var windowWidthText = new StackPanel{
+            Orientation = Orientation.Horizontal
+        };
+        windowWidthText.Children.Add(windowWidthLabel);
+        windowWidthText.Children.Add(windowWidthValue);
+
+        this._stackPanel.Children.Add(windowWidthText);
+        this._stackPanel.Children.Add(this._windowWidthSlider);
+        this.Content = this._stackPanel;
+    }
+
+    void WindowWidthSlider_PropertyChanged<T>(object sender, RoutedPropertyChangedEventArgs<T> e)
+    {
+        if (null == this.Owner)
+            return;
+
+        this.Owner.Width = (double)(object)e.NewValue;
+    }
+}
+#endregion
+
 public class AppSettings
 {
     [DllImport("shell32.dll", CharSet=CharSet.Auto)]
@@ -1251,8 +1328,7 @@ public class ClipboardChangedEventArgs : EventArgs
 }
 '@ -ReferencedAssemblies System.Windows.Forms, System.Drawing -ErrorAction Stop
 }
-
-#endregion
+#endregion ClipBoardWatcher
 
 if ($UserDebug) {
     $DebugPreference = 'Continue'
@@ -1295,6 +1371,13 @@ function Program
         }
     })
     $ClipBoardWatcher.AddToolStripItem($alwaysTopStripItem)
+
+    $optionStripItem = New-Object System.Windows.Forms.ToolStripMenuItem('Option', $null, {
+        Param($s, $e)
+        $OptionWindow = New-Object OptionWindow $MainWindow
+        $OptionWindow.ShowDialog()
+    })
+    $ClipBoardWatcher.AddToolStripItem($optionStripItem)
 
     if ($false -eq $Disable)
     {
