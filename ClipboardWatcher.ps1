@@ -1,5 +1,17 @@
 ﻿<#
+ClipboardWatcher.ps1
+    - クリップボードに変更があった場合にスクリプトを実行する
+    
+    クリップボードの内容が以下の場合WPFでクリップボードの内容をパネル上に表示していく
+    ・テキスト (ContainsTrext)
+        -> URLの場合ハイパーリンクとして扱う
+    ・イメージ (ContainsImage)
+    ・ファイル (ContainsFileDropList)
 
+    起動オプション
+    -AlwaysOnTop 最前面状態で起動
+    -ShowConsole コンソール表示 (デバッグ用)
+    -UserDebug デバッグメッセージ表示
 #>
 using namespace System.Windows
 using namespace System.Windows.Media.Imaging
@@ -171,6 +183,7 @@ public class Paint
 }
 #endregion
 
+#region CustomButton
 public class CustomButton : System.Windows.Controls.Primitives.ButtonBase
 {
     private Point _progressPoint = new Point(0.0, 0.5);
@@ -244,7 +257,9 @@ public class CustomButton : System.Windows.Controls.Primitives.ButtonBase
         this._backgroundRect.Fill = this._mouseOverBackgroundBrush;
     }
 }
+#endregion CustomButton
 
+#region TileButton
 class TileButton : System.Windows.Controls.Primitives.ButtonBase
 {
     private Border _border;
@@ -308,12 +323,8 @@ class TileButton : System.Windows.Controls.Primitives.ButtonBase
         this._border.Background = Brushes.Transparent;
     }
 }
+#endregion TileButton
 
-class CustomUIElementCollection : UIElementCollection
-{
-    public CustomUIElementCollection (System.Windows.UIElement visualParent, System.Windows.FrameworkElement logicalParent) : base(visualParent, logicalParent) {
-    }
-}
 
 #region MainStackPanel
 class MainStackPanel : StackPanel
@@ -1002,13 +1013,11 @@ class FileListPanel : CustomPanel
         var textBlock = new FrameworkElementFactory(typeof(TextBlock));
         textBlock.SetBinding(TextBlock.TextProperty, new Binding("FileNameProperty"));
         
-        //上の2つを入れるStackPanel作成、スタック方向はHorizontal
         var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
         stackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
         stackPanel.AppendChild(iconText);
         stackPanel.AppendChild(textBlock);
 
-        //DataTemplate作成、VisualTreeに上のStackPanelを指定で完成
         var template = new DataTemplate{
             VisualTree = stackPanel
         };
@@ -1038,6 +1047,7 @@ class FileListPanel : CustomPanel
 }
 #endregion FileListPanel
 
+#region FileSystemData
 public class FileSystemData : INotifyPropertyChanged
 {
     public string _iconTextProperty;
@@ -1082,7 +1092,9 @@ public class FileSystemData : INotifyPropertyChanged
         }
     }
 }
+#endregion FyleSystemData
 
+#region Http
 class Http
 {
     private static HttpClient _client;
@@ -1104,6 +1116,7 @@ class Http
         } 
     }
 }
+#endregion Http
 
 #region OptionWindow
 public class OptionWindow : Window
@@ -1177,8 +1190,9 @@ public class OptionWindow : Window
         this.Owner.Width = (double)(object)e.NewValue;
     }
 }
-#endregion
+#endregion OptionWindow
 
+#region AppSettings
 public class AppSettings
 {
     [DllImport("shell32.dll", CharSet=CharSet.Auto)]
@@ -1203,9 +1217,10 @@ public class AppSettings
         }
     }
 }
+#endregion AppSettings
 '@ -ReferencedAssemblies WindowsBase, System.Xaml, System.Net.Http, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
 }
-#endregion
+#endregion WPF
 
 #region ClipBoardWatcher
 Try {
@@ -1345,7 +1360,6 @@ function Program
     Param(
         [Parameter()]
         [bool] $AlwaysOnTop = $false
-        
     )
 
     $UrlRegEx = New-Object RegEx $global:UrlRegExStr
