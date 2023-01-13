@@ -57,7 +57,7 @@ using System.Configuration;
 #region Paint
 public class Paint
 {
-    public static Color BackgroundColor = new Color{A =255, R =30, G = 30, B =30};
+    public static Color BackgroundColor = new Color{A =255, R = 40, G = 40, B = 40};
     public static Brush BackgroundBrush = new SolidColorBrush(BackgroundColor);
 
     public static Brush ForegroundBrush = new SolidColorBrush(Colors.WhiteSmoke);
@@ -67,6 +67,12 @@ public class Paint
 
     public static Color GrayBorderColor = new Color{A =255, R =65, G = 65, B =65};
     public static Brush GrayBorderBrush = new SolidColorBrush(GrayBorderColor);
+
+    public static Color TextBoxBackgroundColor = new Color{A =255, R = 30, G = 30, B = 30};
+    public static Brush TextBoxBackgroundBrush = new SolidColorBrush(TextBoxBackgroundColor);
+
+    public static Color TextBoxBorderColor = new Color{A =255, R = 80, G = 80, B = 80};
+    public static Brush TextBoxBorderBrush = new SolidColorBrush(TextBoxBorderColor);
 
     public static Color ScrollBarBackgroundColor = new Color{A =255, R =40, G = 40, B =40};
     public static Brush ScrollBarBackgroundBrush = new SolidColorBrush(ScrollBarBackgroundColor);
@@ -97,7 +103,7 @@ public class MainWindow : System.Windows.Window
     public MainWindow()
     {
         InitializeComponent();
-        Data.TEST();
+        Data.OnCurrentDirectoryChanged();
     }
 
     private void InitializeComponent()
@@ -122,24 +128,183 @@ class MainGrid : Grid
 {
     public MainGrid()
     {
-        this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(45.0), MinHeight = 20.0});
+        this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(60.0), MinHeight = 20.0});
         this.RowDefinitions.Add(new RowDefinition{MinHeight = 20.0});
         this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(25.0)});
 
+        this.Children.Add(new AddressBox());
         this.Children.Add(new FilerPanel());
         this.Children.Add(new CustomStatusBar());
     }
 }
 #endregion MainGrid
 
+#region AddressBox
+class AddressBox : TextBox, INotifyPropertyChanged
+{
+    public string _strCurrentDirectory;
+    public string StrCurrentDirectory
+    {
+        get
+        {
+            try {
+                _strCurrentDirectory = Data.CurrentDirectory.FullName;
+            } catch { }
+            return _strCurrentDirectory;
+        }
+        set { _strCurrentDirectory = value; OnCurrentDirectoryChanging(); }
+    }
+
+    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+
+    private void OnCurrentDirectoryChanging()
+    {
+        Console.WriteLine("OnCurrentDirectoryChanging");
+        if (Directory.Exists(this._strCurrentDirectory)) {
+            Data.CurrentDirectory = new DirectoryInfo(this._strCurrentDirectory);
+        }
+    }
+
+    public AddressBox()
+    {
+        Grid.SetRow(this, 0);
+        var binding = new Binding("StrCurrentDirectory"){
+            Source = this,
+            Mode = BindingMode.TwoWay,
+            UpdateSourceTrigger = UpdateSourceTrigger.LostFocus,
+        };
+        SetBinding(TextBox.TextProperty, binding);
+        Data.CurrentDirectoryChanged += new PropertyChangedEventHandler(Data_CurrentDirectoryChanged);
+        this.Template = CreateTextBoxTemplate();
+        this.Margin = new Thickness{Left = 5.0, Right = 15.0};
+        this.CaretBrush = Paint.ForegroundBrush;
+        this.Foreground = Paint.ForegroundBrush;
+        this.FontSize = 16.0;
+    }
+
+    private void Data_CurrentDirectoryChanged(object sender, PropertyChangedEventArgs e)
+    {
+        PropertyChanged.Invoke(this, new PropertyChangedEventArgs("StrCurrentDirectory"));
+    }
+
+    private ControlTemplate CreateTextBoxTemplate()
+    {
+        var scrollViewer = new FrameworkElementFactory(typeof(ScrollViewer), "PART_ContentHost");
+        scrollViewer.SetValue(ScrollViewer.VerticalAlignmentProperty, VerticalAlignment.Center);
+        scrollViewer.SetValue(ScrollViewer.VerticalContentAlignmentProperty, VerticalAlignment.Center);
+        scrollViewer.SetValue(ScrollViewer.MarginProperty, new Thickness{Left = 15.0, Right = 15.0, Top = 0.0, Bottom = 0.0});
+
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BorderThicknessProperty, new Thickness(1.0));
+        border.SetValue(Border.BorderBrushProperty, Paint.TextBoxBorderBrush);
+        border.SetValue(Border.HeightProperty, 35.0);
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(17.5));
+        border.SetValue(DockPanel.DockProperty, Dock.Right);
+        border.AppendChild(scrollViewer);
+
+        var leftArrowButton = new FrameworkElementFactory(typeof(TileButton));
+        leftArrowButton.SetValue(TileButton.ContentProperty, "\uE0A6");
+        leftArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        var rightArrowButton = new FrameworkElementFactory(typeof(TileButton));
+        rightArrowButton.SetValue(TileButton.ContentProperty, "\uE0AB");
+        rightArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        var upArrowButton = new FrameworkElementFactory(typeof(TileButton));
+        upArrowButton.SetValue(TileButton.ContentProperty, "\uE110");
+        upArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
+        
+        stackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        stackPanel.SetValue(DockPanel.DockProperty, Dock.Left);
+        stackPanel.AppendChild(leftArrowButton);
+        stackPanel.AppendChild(rightArrowButton);
+        stackPanel.AppendChild(upArrowButton);
+
+        var dockPanel = new FrameworkElementFactory(typeof(DockPanel));
+
+        dockPanel.AppendChild(stackPanel);
+        dockPanel.AppendChild(border);
+
+        var ct = new ControlTemplate(typeof(TextBox)){
+            VisualTree = dockPanel,
+        };
+        return ct;
+    }
+}
+#endregion AddressBox
+
+#region TileButton
+class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropertyChanged
+{
+    public Brush _backgroundBrush;
+    public Brush BackgroundBrush
+    {
+        get { return this._backgroundBrush; }
+        set { this._backgroundBrush = value; OnPropertyChanged("BackgroundBrush"); }
+    }
+    public TileButton()
+    {
+        this.Template = CreateTileButtonTemplate();
+        this.Margin = new Thickness{Left = 5.0, Right = 5.0};
+        this.Foreground = Paint.ForegroundBrush;
+        this.FontFamily = Paint.IconFontFamily;
+        this.FontSize = 15.0;
+        this.MouseEnter += new MouseEventHandler(TileButton_MouseEnter);
+        this.MouseLeave += new MouseEventHandler(TileButton_MouseLeave);
+    }
+
+    private ControlTemplate CreateTileButtonTemplate()
+    {
+        var contentPresenter = new FrameworkElementFactory(typeof(ContentPresenter));
+        contentPresenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        contentPresenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+
+        var border = new FrameworkElementFactory(typeof(Border));
+        var binding = new Binding("BackgroundBrush"){
+            Source = this,
+        };
+        border.SetBinding(Border.BackgroundProperty, binding);
+        border.SetValue(Border.HeightProperty, 30.0);
+        border.SetValue(Border.WidthProperty, 30.0);
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(15));
+        border.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Center);
+        border.SetValue(Border.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        border.AppendChild(contentPresenter);
+
+        var ct = new ControlTemplate(typeof(TileButton)){
+            VisualTree = border,
+        };
+        return ct;
+    }
+
+    void TileButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        this.BackgroundBrush = Paint.MouseOverBackgroundBrush;
+    }
+
+    void TileButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        this.BackgroundBrush = Brushes.Transparent;
+    }
+
+    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+
+    private void OnPropertyChanged(string info)
+    {
+        PropertyChanged.Invoke(this, new PropertyChangedEventArgs(info));
+    }
+}
+#endregion TileButton
+
 #region FilerPanel
 class FilerPanel : DataGrid
 {
     public FilerPanel()
     {
-        Grid.SetColumn(this, 1);
         Grid.SetRow(this, 1);
-        this.Margin = new Thickness{Left = 5.0, Right = 5.0};
+        this.Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 15.0};
         this.Background = Brushes.Transparent;
         this.Foreground = Paint.ForegroundBrush;
         this.FontSize = 15.0;
@@ -147,8 +312,8 @@ class FilerPanel : DataGrid
         this.AutoGenerateColumns = false;
         this.HeadersVisibility = DataGridHeadersVisibility.Column;
         this.HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden;
+        VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
         this.ItemsSource = Data.FileInfoCollection;
-
         this.ItemContainerStyle = CreateItemContainerStyle();
         this.CellStyle = CreateCellStyle();
         this.ColumnHeaderStyle = CreateColumnHeaderStyle();
@@ -184,6 +349,22 @@ class FilerPanel : DataGrid
             Width = new DataGridLength(20.0),
             IsReadOnly = true,
         });
+
+        this.AddHandler(DataGridRow.PreviewMouseDoubleClickEvent, new MouseButtonEventHandler(DataGridRow_DoubleClick));
+    }
+
+    private void DataGridRow_DoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        Console.WriteLine();
+        if (MouseButton.Left == e.ChangedButton)
+        {
+            var path = ((FileSystemInfoEntry)((FrameworkElement)e.OriginalSource).DataContext).Path;
+            if (null != path && Directory.Exists(path))
+            {
+                Console.WriteLine(path);
+                Data.CurrentDirectory =  new DirectoryInfo(path);
+            }
+        }
     }
 
     private DataTemplate CreateNameCellTemplate()
@@ -213,7 +394,6 @@ class FilerPanel : DataGrid
 
     private DataTemplate CreateZoneIdCellTemplate()
     {
-
         var check = new FrameworkElementFactory(typeof(TextBlock));
         check.SetValue(TextBlock.TextProperty, new Binding("HasZoneId"));
         check.SetValue(TextBlock.MarginProperty, new Thickness{Left = 5.0, Right = 5.0});
@@ -250,7 +430,7 @@ class FilerPanel : DataGrid
         var style = new Style();
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         style.Setters.Add(new Setter(Control.HeightProperty, 40.0));
-        style.Setters.Add(new Setter(Control.MarginProperty, new Thickness{Top = 1.0, Bottom = 1.0, Right = 20}));
+        style.Setters.Add(new Setter(Control.MarginProperty, new Thickness{Top = 1.0, Bottom = 1.0}));
         return style;
     }
 
@@ -382,9 +562,6 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
     {
         PropertyChanged.Invoke(this, new PropertyChangedEventArgs(info));
     }
-
-    
-
 }
 #endregion FileSystemInfoEntry
 
@@ -497,6 +674,7 @@ class CustomResourceDictionary : ResourceDictionary
 }
 #endregion CustomResourceDictionary
 
+#region CustomTrack
 class CustomTrack : Track, INotifyPropertyChanged
 {
     public Thickness _borderMargin;
@@ -541,7 +719,6 @@ class CustomTrack : Track, INotifyPropertyChanged
         } else {
             this.BorderMargin = new Thickness{Left = 4.0, Right = 4.0};
         }
-        OnPropertyChanged("BorderMargin");
     }
 
     public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
@@ -551,19 +728,37 @@ class CustomTrack : Track, INotifyPropertyChanged
         PropertyChanged.Invoke(this, new PropertyChangedEventArgs(info));
     }
 }
+#endregion CustomTrack
 
 #region Data
 public static class Data
 {
     public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
+    
+    public static DirectoryInfo _currentDirectory;
+    public static DirectoryInfo CurrentDirectory
+    {
+        get
+        {
+            if (null == _currentDirectory)
+            {
+                _currentDirectory = new DirectoryInfo(AppSettings.DownloadFolder);
+            }
+        
+            return _currentDirectory;
+        }
+        set { _currentDirectory = value; OnCurrentDirectoryChanged();}
+    }
 
-    public static void TEST(){
+    public static event PropertyChangedEventHandler CurrentDirectoryChanged = (sender, e) => { };
+
+    public static void OnCurrentDirectoryChanged(){
         FileInfoCollection.Clear();
-        var di = new DirectoryInfo(AppSettings.DownloadFolder);
-        foreach (FileSystemInfo fsi in di.EnumerateFileSystemInfos())
+        foreach (FileSystemInfo fsi in CurrentDirectory.EnumerateFileSystemInfos())
         {
             FileInfoCollection.Add(new FileSystemInfoEntry(fsi));
         }
+        CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
     }
 }
 #endregion
