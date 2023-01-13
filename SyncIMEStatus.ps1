@@ -13,6 +13,21 @@ Param(
     [switch] $ShowConsole
 )
 
+if ($ShowConsole -eq $false) {
+    #自身のps1をウィンドウ無しで再実行する
+    $strDisable = $(if ($Disable) {'-Disable '} else {''})
+    $strIgnoreZenHan = $(if ($IgnoreZenHan) {'-IgnoreZenHan '} else {''})
+    $StartInfo = New-Object Diagnostics.ProcessStartInfo
+    $StartInfo.UseShellExecute = $false
+    $StartInfo.CreateNoWindow = $true
+    $StartInfo.FileName = "powershell.exe"
+    $StartInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Unrestricted -File "{0}" -ShowConsole {1}{2}' -f $MyInvocation.MyCommand.Path, $strDisable, $strIgnoreZenHan
+    $Process = New-Object Diagnostics.Process
+    $Process.StartInfo = $StartInfo
+    $null = $Process.Start()
+    return
+}
+
 $WinEventTypeDef = @'
 using System;
 using System.Diagnostics;
@@ -29,8 +44,6 @@ public class WinEvent {
         {243, 2, 1},
         {244, 2, 1}
     };
-
-    private static int[] IgnoreKeyCode = { 243, 244 };
 
     private static string[] IMEStateMsg = { "IME OFF", "IME ON" };
 
@@ -191,7 +204,7 @@ public class WinEvent {
 function Program {
     Param(
         [Parameter(Mandatory = $true)]
-        [string] $WinEventTypeDef,
+        [string] [ref]$WinEventTypeDef,
         [Parameter(Mandatory = $true)]
         [string] $MyCommandName,
         [Parameter()]
@@ -199,13 +212,11 @@ function Program {
         [Parameter()]
         [bool] $IgnoreZenHan = $false
     )
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName PresentationCore
 
     Try {
         [void][WinEvent]
     } Catch {
-        Add-Type -TypeDefinition $WinEventTypeDef -ReferencedAssemblies System.Windows.Forms, System.Runtime
+        Add-Type -TypeDefinition $WinEventTypeDef -ReferencedAssemblies System.Windows.Forms
     }
 
     $appContext = New-Object Windows.Forms.ApplicationContext
@@ -269,27 +280,13 @@ function Program {
     $taskTrayIcon.Visible = $false
 }
 
-if ($ShowConsole) {
-    #コンソールありで実行
-    $mutexObj = New-Object Threading.Mutex($false, ('Global\{0}' -f $MyInvocation.MyCommand.Name))
-    if ($mutexObj.WaitOne(0, $false)) {
-        Program -WinEventTypeDef $WinEventTypeDef -MyCommandName $MyInvocation.MyCommand.Name -Disable $Disable -IgnoreZenHan $IgnoreZenHan
-        $mutexObj.ReleaseMutex()
-    }
-    $mutexObj.Close()
 
-} else {
-    #コンソールなしで実行
-    #(実際には自身のps1をウィンドウ無しで再実行する)
-    $strDisable = $(if ($Disable) {'-Disable '} else {''})
-    $strIgnoreZenHan = $(if ($IgnoreZenHan) {'-IgnoreZenHan '} else {''})
-    $StartInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $StartInfo.UseShellExecute = $false
-    $StartInfo.CreateNoWindow = $true
-    $StartInfo.FileName = "powershell.exe"
-    $StartInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Unrestricted -File "{0}" -ShowConsole {1}{2}' -f $MyInvocation.MyCommand.Path, $strDisable, $strIgnoreZenHan
-    $Process = New-Object System.Diagnostics.Process
-    $Process.StartInfo = $StartInfo
-    $null = $Process.Start()
+$mutexObj = New-Object Threading.Mutex($false, ('Global\{0}' -f $MyInvocation.MyCommand.Name))
+
+if ($mutexObj.WaitOne(0, $false)) {
+    Program -WinEventTypeDef ([ref]$WinEventTypeDef) -MyCommandName $MyInvocation.MyCommand.Name -Disable $Disable -IgnoreZenHan $IgnoreZenHan
+    $mutexObj.ReleaseMutex()
 }
+
+$mutexObj.Close()
 
