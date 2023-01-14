@@ -556,28 +556,7 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
     [DllImport("user32.dll", EntryPoint="DestroyIcon", SetLastError=true)]
     private static extern int DestroyIcon(IntPtr hIcon);
 
-    public FileSystemInfoEntry()
-    {
-    }
-
     public FileSystemInfoEntry(FileSystemInfo fsi)
-    {
-        InitializeEntry(fsi);
-    }
-
-    public FileSystemInfoEntry CreateCloneInstance()
-    {
-        return new FileSystemInfoEntry(){
-            _icon = this._icon,
-            _name = this._name,
-            _path = this._path,
-            _lastWriteTime = this._lastWriteTime,
-            _isDirectory = this._isDirectory,
-            _hasZoneId = this._hasZoneId,
-        };      
-    }
-
-    private void InitializeEntry(FileSystemInfo fsi)
     {
         this._path = fsi.FullName;
         this._name = fsi.Name;
@@ -937,6 +916,8 @@ public class Data
 
     public async void OnCurrentDirectoryChanged()
     {
+        this.CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
+
         if (!(this.CurrentDirectory.Exists))
         {
             return;
@@ -953,8 +934,6 @@ public class Data
         }
 
         await GetCollectionAsync();
-
-        this.CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
     }
 
     public Task GetCollectionAsync()
@@ -993,7 +972,7 @@ public class Data
 #endregion
 
 #region AppSettings
-public class AppSettings
+static public class AppSettings
 {
     private static int _historyLimit = 0;
     public static int HistoryLimit{
@@ -1057,11 +1036,11 @@ public class AppSettings
             if (null == _desktopFolder) {
                 _desktopFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             }
-            return _downloadFolder;
+            return _desktopFolder;
         }
         set
         {
-            _downloadFolder = value;
+            _desktopFolder = value;
         }
     }
 }
