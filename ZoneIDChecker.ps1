@@ -387,7 +387,7 @@ class FilerPanel : DataGrid
         this.HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden;
         VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
         Binding binding = new Binding() {
-            Source = Data.FileInfoCollection
+            Source = Data.FileInfoCollectionView
         };
         this.SetBinding(FilerPanel.ItemsSourceProperty, binding);
         this.ItemContainerStyle = CreateItemContainerStyle();
@@ -401,7 +401,8 @@ class FilerPanel : DataGrid
             Width = new DataGridLength(1.0, DataGridLengthUnitType.Star),
             MinWidth = 50.0,
             IsReadOnly = true,
-            CanUserSort = true
+            CanUserSort = true,
+            SortMemberPath = "Name"
         });
 
         this.Columns.Add(new DataGridTemplateColumn{
@@ -410,7 +411,8 @@ class FilerPanel : DataGrid
             Width = new DataGridLength(150.0),
             MinWidth = 50.0,
             IsReadOnly = true,
-            CanUserSort = true
+            CanUserSort = true,
+            SortMemberPath = "HasZoneId"
         });
 
         this.Columns.Add(new DataGridTextColumn{
@@ -476,7 +478,7 @@ class FilerPanel : DataGrid
     private DataTemplate CreateZoneIdCellTemplate()
     {
         var check = new FrameworkElementFactory(typeof(TextBlock));
-        check.SetValue(TextBlock.TextProperty, new Binding("HasZoneId"));
+        check.SetValue(TextBlock.TextProperty, new Binding("HasZoneIdIcon"));
         check.SetValue(TextBlock.MarginProperty, new Thickness{Left = 55.0});
         check.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         //check.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
@@ -521,7 +523,7 @@ class FilerPanel : DataGrid
     private Style CreateTextBlockStyle()
     {
         var style = new Style();
-        //style.Setters.Add(new Setter(TextBlock.PaddingProperty, new Thickness{Left = 5.0, Right = 5.0}));
+        style.Setters.Add(new Setter(TextBlock.MarginProperty, new Thickness{Left = 5.0}));
         style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
         style.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center));
         return style;
@@ -578,7 +580,13 @@ public class FileSystemInfoEntry
         get { return this._path; }
     }
 
-    public string HasZoneId
+    public bool HasZoneId
+    {
+        get
+        { return this._hasZoneId; }
+    }
+
+    public string HasZoneIdIcon
     {
         get
         {
@@ -608,13 +616,8 @@ public class FileSystemInfoEntry
 
 public static class Shell
 {
-    private const uint STATUS_BUFFER_OVERFLOW = 0x80000005;
-    private static int SIZE_SHFILEINFO;
-
-    static Shell()
-    {
-        SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
-    }
+    private static readonly IntPtr STATUS_BUFFER_OVERFLOW = (IntPtr)0x80000005;
+    private static int SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
 
     [DllImport("ntdll.dll")]
     private static extern IntPtr NtQueryInformationFile(SafeFileHandle fileHandle, out IO_STATUS_BLOCK IoStatusBlock, IntPtr pInfoBlock, int length, FILE_INFORMATION_CLASS fileInformation);  
@@ -628,13 +631,13 @@ public static class Shell
     [DllImport("user32.dll", EntryPoint="DestroyIcon")]
     private static extern int DestroyIcon(IntPtr hIcon);
 
-    struct IO_STATUS_BLOCK {
+    private struct IO_STATUS_BLOCK {
         internal uint status;
         internal ulong information;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    struct FILE_STREAM_INFORMATION {
+    private struct FILE_STREAM_INFORMATION {
         internal int NextEntryOffset;
         internal int StreamNameLength;
         internal ulong StreamSize;
@@ -646,13 +649,13 @@ public static class Shell
     [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Auto)]
     private struct SHFILEINFO
     {
-        public IntPtr hIcon;
-        public int iIcon;
-        public uint dwAttributes;
+        internal IntPtr hIcon;
+        internal int iIcon;
+        internal uint dwAttributes;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst=260)]
-        public string szDisplayName;
+        internal string szDisplayName;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst=80)]
-        public string szTypeName;
+        internal string szTypeName;
     };
 
     enum SHGFI : uint
@@ -670,7 +673,6 @@ public static class Shell
 
     public static bool CheckZoneId(string path) {
         bool result = false;
-        IntPtr buffer = IntPtr.Zero;
         FileStream fs = null;
         try {
             fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Delete);
@@ -678,14 +680,16 @@ public static class Shell
             return false;
         }
 
+        IntPtr buffer = IntPtr.Zero;
         try {
             IO_STATUS_BLOCK iosb = new IO_STATUS_BLOCK();
             FILE_STREAM_INFORMATION fsi = new FILE_STREAM_INFORMATION();
-            for (int i = 1; i < 255; i++)
+            for (int i = 1; i < 256; i++)
             {
+                //Console.WriteLine(String.Format("Loop {0}", i));
                 buffer = Marshal.AllocCoTaskMem(1024 * i);
                 IntPtr iprc = NtQueryInformationFile(fs.SafeFileHandle, out iosb, buffer, (1024 * i), FILE_INFORMATION_CLASS.FileStreamInformation);
-                if (iprc == (IntPtr)STATUS_BUFFER_OVERFLOW)
+                if (iprc == STATUS_BUFFER_OVERFLOW)
                 {
                     Marshal.FreeCoTaskMem(buffer);
                     continue;
@@ -700,7 +704,7 @@ public static class Shell
             {
                 //Console.WriteLine(path);
                 IntPtr p_fsi = new IntPtr(buffer.ToInt64());
-                for (int i = 0; i < 255; i++)
+                for (int i = 0; i < 256; i++)
                 {
                     fsi = (FILE_STREAM_INFORMATION)Marshal.PtrToStructure(p_fsi, typeof(FILE_STREAM_INFORMATION));
                     //Console.WriteLine(fsi.StreamName.Substring(0, (fsi.StreamNameLength / 2)));
@@ -856,6 +860,7 @@ class CustomTrack : Track, INotifyPropertyChanged
 public static class Data
 {
     public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection;
+    public static CollectionViewSource FileInfoCollectionView;
     public static object _lockObject;
     public static CancellationTokenSource cTokenSource = null;
 
@@ -863,6 +868,11 @@ public static class Data
     {
         _lockObject = new object();
         FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
+        FileInfoCollectionView = new CollectionViewSource{
+            Source = FileInfoCollection,
+            IsLiveSortingRequested = true,
+        };
+        FileInfoCollectionView.SortDescriptions.Add(new SortDescription(AppSettings.DefaultSortProperty, AppSettings.DefaultSortDirection));
         BindingOperations.EnableCollectionSynchronization(FileInfoCollection, _lockObject);
     }
 
@@ -1008,6 +1018,37 @@ static public class AppSettings
         set
         {
             _historyLimit = value;
+        }
+    }
+
+    private static string _defaultSortProperty = ConfigurationManager.AppSettings["DefaultSortProperty"];
+    public static string DefaultSortProperty
+    {
+        get
+        {
+            if (null == _defaultSortProperty) {
+                _defaultSortProperty = "LastWriteTime";
+            }
+            return _defaultSortProperty;
+        }
+    }
+
+    private static string _defaultSortDirection = ConfigurationManager.AppSettings["DefaultSortDirection"];
+    public static ListSortDirection DefaultSortDirection
+    {
+        get
+        {
+            if (null == _defaultSortDirection)
+            {
+                return ListSortDirection.Descending;
+            }
+            else if ("Ascending" == _defaultSortDirection.Trim())
+            {
+                return ListSortDirection.Ascending;
+            } else
+            {
+                return ListSortDirection.Descending;
+            }
         }
     }
 
