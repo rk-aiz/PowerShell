@@ -40,6 +40,7 @@ Try {
 Add-Type -TypeDefinition @'
 using System;
 using System.IO;
+using System.Drawing;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Data;
@@ -48,11 +49,17 @@ using System.Windows.Media.Imaging;
 using System.Windows.Interop;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 using System.ComponentModel;
 using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 using System.Configuration;
+using System.Diagnostics;
+using System.Threading;
+
+using System.Threading.Tasks;
 
 #region Paint
 public class Paint
@@ -99,11 +106,10 @@ public class Paint
 #region MainWindow
 public class MainWindow : System.Windows.Window
 {
-
+    private Data _data;
     public MainWindow()
     {
         InitializeComponent();
-        Data.OnCurrentDirectoryChanged();
     }
 
     private void InitializeComponent()
@@ -117,24 +123,42 @@ public class MainWindow : System.Windows.Window
         this.Background = Paint.BackgroundBrush;
         this.Loaded += (sender, e) => {this.Topmost = false;};
         this.Resources = new CustomResourceDictionary();
-        this.Content = new MainGrid();
+
+        this._data = new Data();
+        this.Content = new MainGrid(this._data);
     }
 
+    public void SetCurrentDirectory(string strCurrentDirectory)
+    {
+        this._data.CurrentDirectory = new DirectoryInfo(strCurrentDirectory);
+    }
+
+    ~MainWindow()
+    {
+        if (true == this.IsVisible)
+            Close();
+    }
 }
 #endregion
 
 #region MainGrid
 class MainGrid : Grid
 {
-    public MainGrid()
+    private Data _data;
+
+    public MainGrid(Data data)
     {
         this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(60.0), MinHeight = 20.0});
         this.RowDefinitions.Add(new RowDefinition{MinHeight = 20.0});
         this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(25.0)});
 
-        this.Children.Add(new AddressBox());
-        this.Children.Add(new FilerPanel());
-        this.Children.Add(new CustomStatusBar());
+        this._data = data;
+        this.Dispatcher.Invoke((Action)(delegate
+        {
+            this.Children.Add(new AddressBox(this._data));
+            this.Children.Add(new FilerPanel(this._data));
+            this.Children.Add(new CustomStatusBar());
+        }));
     }
 }
 #endregion MainGrid
@@ -142,14 +166,18 @@ class MainGrid : Grid
 #region AddressBox
 class AddressBox : TextBox, INotifyPropertyChanged
 {
+    private Data _data;
+
     public string _strCurrentDirectory;
     public string StrCurrentDirectory
     {
         get
         {
             try {
-                _strCurrentDirectory = Data.CurrentDirectory.FullName;
-            } catch { }
+                _strCurrentDirectory = this._data.CurrentDirectory.FullName;
+            } catch {
+                _strCurrentDirectory = String.Empty;
+            }
             return _strCurrentDirectory;
         }
         set { _strCurrentDirectory = value; OnCurrentDirectoryChanging(); }
@@ -161,12 +189,13 @@ class AddressBox : TextBox, INotifyPropertyChanged
     {
         Console.WriteLine("OnCurrentDirectoryChanging");
         if (Directory.Exists(this._strCurrentDirectory)) {
-            Data.CurrentDirectory = new DirectoryInfo(this._strCurrentDirectory);
+            this._data.CurrentDirectory = new DirectoryInfo(this._strCurrentDirectory);
         }
     }
 
-    public AddressBox()
+    public AddressBox(Data data)
     {
+        this._data = data;
         Grid.SetRow(this, 0);
         var binding = new Binding("StrCurrentDirectory"){
             Source = this,
@@ -174,7 +203,7 @@ class AddressBox : TextBox, INotifyPropertyChanged
             UpdateSourceTrigger = UpdateSourceTrigger.LostFocus,
         };
         SetBinding(TextBox.TextProperty, binding);
-        Data.CurrentDirectoryChanged += new PropertyChangedEventHandler(Data_CurrentDirectoryChanged);
+        this._data.CurrentDirectoryChanged += new PropertyChangedEventHandler(Data_CurrentDirectoryChanged);
         this.Template = CreateTextBoxTemplate();
         this.Margin = new Thickness{Left = 5.0, Right = 15.0};
         this.CaretBrush = Paint.ForegroundBrush;
@@ -212,6 +241,7 @@ class AddressBox : TextBox, INotifyPropertyChanged
 
         var upArrowButton = new FrameworkElementFactory(typeof(TileButton));
         upArrowButton.SetValue(TileButton.ContentProperty, "\uE110");
+        upArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(UpArrowButton_Click));
         upArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
 
         var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
@@ -231,6 +261,13 @@ class AddressBox : TextBox, INotifyPropertyChanged
             VisualTree = dockPanel,
         };
         return ct;
+    }
+
+    private void UpArrowButton_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            this._data.CurrentDirectory = this._data.CurrentDirectory.Parent;
+        } catch { }
     }
 }
 #endregion AddressBox
@@ -301,8 +338,11 @@ class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropert
 #region FilerPanel
 class FilerPanel : DataGrid
 {
-    public FilerPanel()
+    private Data _data;
+    private object _lockObject = new object();
+    public FilerPanel(Data data)
     {
+        this._data = data;
         Grid.SetRow(this, 1);
         this.Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 15.0};
         this.Background = Brushes.Transparent;
@@ -313,7 +353,11 @@ class FilerPanel : DataGrid
         this.HeadersVisibility = DataGridHeadersVisibility.Column;
         this.HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden;
         VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
-        this.ItemsSource = Data.FileInfoCollection;
+        //this.DataContext = this._data;
+        Binding binding = new Binding() {
+            Source = this._data.FileInfoCollection
+        };
+        this.SetBinding(FilerPanel.ItemsSourceProperty, binding);
         this.ItemContainerStyle = CreateItemContainerStyle();
         this.CellStyle = CreateCellStyle();
         this.ColumnHeaderStyle = CreateColumnHeaderStyle();
@@ -355,15 +399,15 @@ class FilerPanel : DataGrid
 
     private void DataGridRow_DoubleClick(object sender, MouseButtonEventArgs e)
     {
-        Console.WriteLine();
         if (MouseButton.Left == e.ChangedButton)
         {
-            var path = ((FileSystemInfoEntry)((FrameworkElement)e.OriginalSource).DataContext).Path;
-            if (null != path && Directory.Exists(path))
-            {
-                Console.WriteLine(path);
-                Data.CurrentDirectory =  new DirectoryInfo(path);
-            }
+            try {
+                var path = ((FileSystemInfoEntry)((FrameworkElement)e.OriginalSource).DataContext).Path;
+                if (null != path && Directory.Exists(path))
+                {
+                    this._data.CurrentDirectory =  new DirectoryInfo(path);
+                }
+            } catch { }
         }
     }
 
@@ -488,26 +532,89 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
 
     [DllImport("shell32.dll", CharSet=CharSet.Auto)]
     private static extern IntPtr SHGetFileInfo(string pszPath, FileAttributes dwFileAttributes, out SHFILEINFO psfi, int cbFileInfo, SHGFI uFlags);
+    
+    [DllImport("shell32.dll", CharSet=CharSet.Auto)]
+    private static extern uint ExtractIconEx(string szFileName, int nIconIndex,  out IntPtr phiconLarge, out IntPtr phiconSmall, int nIcons);
+    
+    [DllImport("user32.dll", EntryPoint="DestroyIcon", SetLastError=true)]
+    private static extern int DestroyIcon(IntPtr hIcon);
+
+    public FileSystemInfoEntry()
+    {
+    }
 
     public FileSystemInfoEntry(FileSystemInfo fsi)
+    {
+        InitializeEntry(fsi);
+    }
+
+    public FileSystemInfoEntry CreateCloneInstance()
+    {
+        return new FileSystemInfoEntry(){
+            _icon = this._icon,
+            _name = this._name,
+            _path = this._path,
+            _lastWriteTime = this._lastWriteTime,
+            _isDirectory = this._isDirectory,
+            _hasZoneId = this._hasZoneId,
+        };      
+    }
+
+    private void InitializeEntry(FileSystemInfo fsi)
     {
         this._path = fsi.FullName;
         this._name = fsi.Name;
         this._lastWriteTime = fsi.LastWriteTime;
         this._isDirectory = (bool)((fsi.Attributes & FileAttributes.Directory) == FileAttributes.Directory);
         this._icon = GetIconBitmapSource(this._path, fsi.Attributes);
+        this._icon.Freeze();
         if (false == this._isDirectory) {
             this._hasZoneId = NTFS.CheckZoneId(this._path);
+        }
+    }
+
+    private static BitmapSource GetSystemIcon(int nIconIndex)
+    {
+        try
+        {
+            IntPtr hLIcon = IntPtr.Zero;
+            IntPtr hSIcon = IntPtr.Zero;
+            ExtractIconEx(AppSettings.Shell32, nIconIndex, out hLIcon, out hSIcon, 1);
+
+            var bms = Imaging.CreateBitmapSourceFromHIcon(hSIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            DestroyIcon(hLIcon);
+            DestroyIcon(hSIcon);
+
+            return bms;
+        } catch { 
+            return BitmapSource.Create(24, 24, 96, 96, PixelFormats.Default, BitmapPalettes.WebPalette, new byte[72], 3);
         }
     }
 
     public static BitmapSource GetIconBitmapSource(string strPath, FileAttributes attr)
     {
         SHFILEINFO info = new SHFILEINFO();
-        SHGFI flags = SHGFI.Icon | SHGFI.SmallIcon | SHGFI.UseFileAttributes;
-        SHGetFileInfo(strPath, attr, out info, Marshal.SizeOf(info), flags);
+        try {
             
-        return Imaging.CreateBitmapSourceFromHIcon(info.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            SHGFI flags = SHGFI.Icon | SHGFI.SmallIcon | SHGFI.UseFileAttributes;
+
+            SHGetFileInfo(strPath, attr, out info, Marshal.SizeOf(info), flags);
+        } catch {
+            return GetSystemIcon(0);
+        }
+
+        if (IntPtr.Zero == info.hIcon || null == info.hIcon)
+            return GetSystemIcon(0);
+
+        BitmapSource bms = Imaging.CreateBitmapSourceFromHIcon(info.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+
+        if (null != bms)
+        {
+            DestroyIcon(info.hIcon);
+            return bms;
+        }
+        else
+            return GetSystemIcon(0);
     }
 
     public BitmapSource Icon
@@ -595,43 +702,49 @@ public static class NTFS
     public static bool CheckZoneId(string path) {
         bool result = false;
         IntPtr buffer = IntPtr.Zero;
+        FileStream fs = null;
+        try {
+            fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Delete);
+        } catch {
+            return false;
+        }
+
         try {
             IO_STATUS_BLOCK iosb = new IO_STATUS_BLOCK();
             FILE_STREAM_INFORMATION fsi = new FILE_STREAM_INFORMATION();
-            using(FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)) {
-                for (int i = 1; i < 255; i++)
+            for (int i = 1; i < 255; i++)
+            {
+                buffer = Marshal.AllocCoTaskMem(1024 * i);
+                IntPtr iprc = NtQueryInformationFile(fs.SafeFileHandle, out iosb, buffer, (1024 * i), FILE_INFORMATION_CLASS.FileStreamInformation);
+                if (iprc == (IntPtr)STATUS_BUFFER_OVERFLOW)
                 {
-                    buffer = Marshal.AllocCoTaskMem(1024 * i);
-                    IntPtr iprc = NtQueryInformationFile(fs.SafeFileHandle, out iosb, buffer, (1024 * i), FILE_INFORMATION_CLASS.FileStreamInformation);
-                    if (iprc == (IntPtr)STATUS_BUFFER_OVERFLOW)
-                    {
-                        Marshal.FreeCoTaskMem(buffer);
-                        continue;
-                    }
-                    else if(iprc == IntPtr.Zero)
-                    {
-                        break;
-                    }
+                    Marshal.FreeCoTaskMem(buffer);
+                    continue;
                 }
-
-                if (iosb.status == 0)
+                else if(iprc == IntPtr.Zero)
                 {
-                    //Console.WriteLine(path);
-                    IntPtr p_fsi = new IntPtr(buffer.ToInt64());
-                    for (int i = 0; i < 255; i++)
-                    {
-                        fsi = (FILE_STREAM_INFORMATION)Marshal.PtrToStructure(p_fsi, typeof(FILE_STREAM_INFORMATION));
-                        //Console.WriteLine(fsi.StreamName.Substring(0, (fsi.StreamNameLength / 2)));
-                        result = fsi.StreamName.Substring(0, (fsi.StreamNameLength / 2)).Contains(":Zone.Identifier");
-                        if (fsi.NextEntryOffset != 0) {
-                            p_fsi += fsi.NextEntryOffset;
-                        } else {
-                            break;
-                        }
+                    break;
+                }
+            }
+
+            if (iosb.status == 0)
+            {
+                //Console.WriteLine(path);
+                IntPtr p_fsi = new IntPtr(buffer.ToInt64());
+                for (int i = 0; i < 255; i++)
+                {
+                    fsi = (FILE_STREAM_INFORMATION)Marshal.PtrToStructure(p_fsi, typeof(FILE_STREAM_INFORMATION));
+                    //Console.WriteLine(fsi.StreamName.Substring(0, (fsi.StreamNameLength / 2)));
+                    result = fsi.StreamName.Substring(0, (fsi.StreamNameLength / 2)).Contains(":Zone.Identifier");
+                    if (fsi.NextEntryOffset != 0) {
+                        p_fsi += fsi.NextEntryOffset;
+                    } else {
+                        break;
                     }
                 }
             }
         } finally {
+            if(null != fs) { fs.Close(); }
             if(buffer != IntPtr.Zero) { Marshal.FreeCoTaskMem(buffer); }
         }
         return result;
@@ -731,18 +844,27 @@ class CustomTrack : Track, INotifyPropertyChanged
 #endregion CustomTrack
 
 #region Data
-public static class Data
+public class Data
 {
-    public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
-    
-    public static DirectoryInfo _currentDirectory;
-    public static DirectoryInfo CurrentDirectory
+    public ObservableCollection<FileSystemInfoEntry> FileInfoCollection;
+    public object _lockObject;
+    public CancellationTokenSource cTokenSource = null;
+
+    public Data()
+    {
+        this._lockObject = new object();
+        this.FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
+        BindingOperations.EnableCollectionSynchronization(this.FileInfoCollection,this._lockObject);
+    }
+
+    public DirectoryInfo _currentDirectory;
+    public DirectoryInfo CurrentDirectory
     {
         get
         {
             if (null == _currentDirectory)
             {
-                _currentDirectory = new DirectoryInfo(AppSettings.DownloadFolder);
+                _currentDirectory = new DirectoryInfo(AppSettings.DesktopFolder);
             }
         
             return _currentDirectory;
@@ -750,15 +872,56 @@ public static class Data
         set { _currentDirectory = value; OnCurrentDirectoryChanged();}
     }
 
-    public static event PropertyChangedEventHandler CurrentDirectoryChanged = (sender, e) => { };
+    public event PropertyChangedEventHandler CurrentDirectoryChanged = (sender, e) => { };
 
-    public static void OnCurrentDirectoryChanged(){
-        FileInfoCollection.Clear();
-        foreach (FileSystemInfo fsi in CurrentDirectory.EnumerateFileSystemInfos())
+    public async void OnCurrentDirectoryChanged()
+    {
+        if (null != cTokenSource)
         {
-            FileInfoCollection.Add(new FileSystemInfoEntry(fsi));
+            this.cTokenSource.Cancel();
         }
-        CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
+
+        lock (this._lockObject)
+        {
+            this.FileInfoCollection.Clear();
+        }
+
+        await GetCollectionAsync();
+
+        this.CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
+    }
+
+    public Task GetCollectionAsync()
+    {
+        if (null == cTokenSource)
+        {
+            this.cTokenSource = new CancellationTokenSource();
+        }
+        else
+        {
+            this.cTokenSource.Dispose();
+            this.cTokenSource = new CancellationTokenSource();
+        }
+        CancellationToken token = this.cTokenSource.Token;
+        return Task.Run(() => GetCollection(token), this.cTokenSource.Token).ContinueWith(t => {
+            this.cTokenSource.Dispose();
+            this.cTokenSource = null;
+        });
+    }
+
+    public void GetCollection(CancellationToken token)
+    {
+        lock (this._lockObject)
+        {
+            foreach (var info in this.CurrentDirectory.EnumerateFileSystemInfos())
+            {
+                if (token.IsCancellationRequested)
+                {
+                    token.ThrowIfCancellationRequested();
+                }
+                this.FileInfoCollection.Add(new FileSystemInfoEntry(info));
+            }
+        }
     }
 }
 #endregion
@@ -769,6 +932,18 @@ public class AppSettings
     [DllImport("shell32.dll", CharSet=CharSet.Auto)]
     private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint dwFlags, IntPtr hToken, out string pszPath);
     
+    private static string _shell32;
+    public static string Shell32
+    {
+        get
+        {
+            if (null == _shell32)
+                _shell32 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "shell32.dll");
+
+            return _shell32;
+        }
+    }
+
     private static readonly Guid Downloads = new Guid("374DE290-123F-4565-9164-39C4925E467B");
     private static string _downloadFolder = ConfigurationManager.AppSettings["DownloadFolder"];
     public static string DownloadFolder{
@@ -786,9 +961,24 @@ public class AppSettings
             _downloadFolder = value;
         }
     }
+
+    private static string _desktopFolder = ConfigurationManager.AppSettings["DesktopFolder"];
+    public static string DesktopFolder{
+        get
+        {
+            if (null == _desktopFolder) {
+                _desktopFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            }
+            return _downloadFolder;
+        }
+        set
+        {
+            _downloadFolder = value;
+        }
+    }
 }
 #endregion AppSettings
-'@ -ReferencedAssemblies WindowsBase, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
+'@ -ReferencedAssemblies WindowsBase, System.Threading, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
 }
 
 if ($UserDebug) {
@@ -800,7 +990,9 @@ if ($UserDebug) {
 function Program
 {
     $MainWindow = New-Object MainWindow
+    $MainWindow.SetCurrentDirectory([AppSettings]::DownloadFolder)
     $null = $MainWindow.ShowDialog()
+    #$MainWindow.Close()
 }
 # endregion
 
