@@ -58,6 +58,7 @@ using Microsoft.Win32.SafeHandles;
 using System.Configuration;
 using System.Diagnostics;
 using System.Threading;
+using System.Collections.Specialized ;
 
 using System.Threading.Tasks;
 
@@ -155,7 +156,7 @@ class MainGrid : Grid
         this._data = data;
         this.Dispatcher.Invoke((Action)(delegate
         {
-            this.Children.Add(new AddressBox(this._data));
+            this.Children.Add(new NavigatePanel(this._data));
             this.Children.Add(new FilerPanel(this._data));
             this.Children.Add(new CustomStatusBar());
         }));
@@ -163,8 +164,8 @@ class MainGrid : Grid
 }
 #endregion MainGrid
 
-#region AddressBox
-class AddressBox : TextBox, INotifyPropertyChanged
+#region NavigatePanel
+class NavigatePanel : TextBox, INotifyPropertyChanged
 {
     private Data _data;
 
@@ -193,7 +194,7 @@ class AddressBox : TextBox, INotifyPropertyChanged
         }
     }
 
-    public AddressBox(Data data)
+    public NavigatePanel(Data data)
     {
         this._data = data;
         Grid.SetRow(this, 0);
@@ -234,15 +235,17 @@ class AddressBox : TextBox, INotifyPropertyChanged
         var leftArrowButton = new FrameworkElementFactory(typeof(TileButton));
         leftArrowButton.SetValue(TileButton.ContentProperty, "\uE0A6");
         leftArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+        leftArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(LeftArrowButton_Click));
 
         var rightArrowButton = new FrameworkElementFactory(typeof(TileButton));
         rightArrowButton.SetValue(TileButton.ContentProperty, "\uE0AB");
         rightArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+        rightArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(RightArrowButton_Click));
 
         var upArrowButton = new FrameworkElementFactory(typeof(TileButton));
         upArrowButton.SetValue(TileButton.ContentProperty, "\uE110");
-        upArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(UpArrowButton_Click));
         upArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+        upArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(UpArrowButton_Click));
 
         var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
         
@@ -263,6 +266,20 @@ class AddressBox : TextBox, INotifyPropertyChanged
         return ct;
     }
 
+    private void LeftArrowButton_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            this._data.PrevDirectory();
+        } catch { }
+    }
+
+    private void RightArrowButton_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            this._data.NextDirectory();
+        } catch { }
+    }
+
     private void UpArrowButton_Click(object sender, RoutedEventArgs e)
     {
         try {
@@ -270,7 +287,7 @@ class AddressBox : TextBox, INotifyPropertyChanged
         } catch { }
     }
 }
-#endregion AddressBox
+#endregion NavigatePanel
 
 #region TileButton
 class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropertyChanged
@@ -866,16 +883,65 @@ public class Data
             {
                 _currentDirectory = new DirectoryInfo(AppSettings.DesktopFolder);
             }
-        
             return _currentDirectory;
         }
-        set { _currentDirectory = value; OnCurrentDirectoryChanged();}
+        set
+        {
+            if (null != _currentDirectory)
+            {
+                if (0 == _prevDirectories.Count || _prevDirectories[_prevDirectories.Count - 1] != _currentDirectory.FullName)
+                {
+                    _prevDirectories.Add(_currentDirectory.FullName);
+                }
+            }
+            if (AppSettings.HistoryLimit <= _prevDirectories.Count)
+            {
+                _prevDirectories.RemoveAt(0);
+            }
+            if (_nextDirectories.Count > 0)
+            {
+                _nextDirectories.Clear();
+            }
+            _currentDirectory = value;
+            OnCurrentDirectoryChanged();
+        }
+    }
+
+    private StringCollection _prevDirectories = new StringCollection();
+    private StringCollection _nextDirectories = new StringCollection();
+    public void PrevDirectory()
+    {
+        if (0 < _prevDirectories.Count)
+        {
+            string path = this._prevDirectories[this._prevDirectories.Count - 1];
+            this._prevDirectories.RemoveAt(this._prevDirectories.Count - 1);
+            this._nextDirectories.Add(CurrentDirectory.FullName);
+            this._currentDirectory = new DirectoryInfo(path);
+            OnCurrentDirectoryChanged();
+        }
+    }
+
+    public void NextDirectory()
+    {
+        if (0 < _nextDirectories.Count)
+        {
+            string path = this._nextDirectories[this._nextDirectories.Count - 1];
+            this._nextDirectories.RemoveAt(this._nextDirectories.Count - 1);
+            this._prevDirectories.Add(CurrentDirectory.FullName);
+            this._currentDirectory = new DirectoryInfo(path);
+            OnCurrentDirectoryChanged();
+        }
     }
 
     public event PropertyChangedEventHandler CurrentDirectoryChanged = (sender, e) => { };
 
     public async void OnCurrentDirectoryChanged()
     {
+        if (!(this.CurrentDirectory.Exists))
+        {
+            return;
+        }
+
         if (null != cTokenSource)
         {
             this.cTokenSource.Cancel();
@@ -929,6 +995,28 @@ public class Data
 #region AppSettings
 public class AppSettings
 {
+    private static int _historyLimit = 0;
+    public static int HistoryLimit{
+        get
+        {
+            if (0 >= _historyLimit) {
+                string strHistoryLimit = ConfigurationManager.AppSettings["HistoryLimit"];
+                int limit;
+                try {
+                    limit = Int32.Parse(strHistoryLimit);
+                } catch {
+                    limit = 256;
+                }
+                _historyLimit = limit;
+            }
+            return _historyLimit;
+        }
+        set
+        {
+            _historyLimit = value;
+        }
+    }
+
     [DllImport("shell32.dll", CharSet=CharSet.Auto)]
     private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint dwFlags, IntPtr hToken, out string pszPath);
     
