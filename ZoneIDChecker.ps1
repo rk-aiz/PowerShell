@@ -108,7 +108,6 @@ public class Paint
 #region MainWindow
 public class MainWindow : System.Windows.Window
 {
-    private Data _data;
     public MainWindow()
     {
         InitializeComponent();
@@ -126,15 +125,12 @@ public class MainWindow : System.Windows.Window
         this.Loaded += (sender, e) => {this.Topmost = false;};
         this.Resources = new CustomResourceDictionary();
 
-        this._data = new Data{
-            mainWindow = this,
-        };
-        this.Content = new MainGrid(this._data);
+        this.Content = new MainGrid();
     }
 
     public void SetCurrentDirectory(string strCurrentDirectory)
     {
-        this._data.CurrentDirectory = new DirectoryInfo(strCurrentDirectory);
+        Data.CurrentDirectory = new DirectoryInfo(strCurrentDirectory);
     }
 
     ~MainWindow()
@@ -148,21 +144,16 @@ public class MainWindow : System.Windows.Window
 #region MainGrid
 class MainGrid : Grid
 {
-    private Data _data;
 
-    public MainGrid(Data data)
+    public MainGrid()
     {
         this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(60.0), MinHeight = 20.0});
         this.RowDefinitions.Add(new RowDefinition{MinHeight = 20.0});
         this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(25.0)});
 
-        this._data = data;
-        this.Dispatcher.Invoke((Action)(delegate
-        {
-            this.Children.Add(new NavigatePanel(this._data));
-            this.Children.Add(new FilerPanel(this._data));
-            this.Children.Add(new CustomStatusBar());
-        }));
+        this.Children.Add(new NavigatePanel());
+        this.Children.Add(new FilerPanel());
+        this.Children.Add(new CustomStatusBar());
     }
 }
 #endregion MainGrid
@@ -170,15 +161,13 @@ class MainGrid : Grid
 #region NavigatePanel
 class NavigatePanel : TextBox, INotifyPropertyChanged
 {
-    private Data _data;
-
     public string _strCurrentDirectory;
     public string StrCurrentDirectory
     {
         get
         {
             try {
-                _strCurrentDirectory = this._data.CurrentDirectory.FullName;
+                _strCurrentDirectory = Data.CurrentDirectory.FullName;
             } catch {
                 _strCurrentDirectory = String.Empty;
             }
@@ -192,13 +181,12 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
     private void OnCurrentDirectoryChanging()
     {
         if (Directory.Exists(this._strCurrentDirectory)) {
-            this._data.CurrentDirectory = new DirectoryInfo(this._strCurrentDirectory);
+            Data.CurrentDirectory = new DirectoryInfo(this._strCurrentDirectory);
         }
     }
 
-    public NavigatePanel(Data data)
+    public NavigatePanel()
     {
-        this._data = data;
         Grid.SetRow(this, 0);
         var binding = new Binding("StrCurrentDirectory"){
             Source = this,
@@ -206,7 +194,7 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
             UpdateSourceTrigger = UpdateSourceTrigger.LostFocus,
         };
         SetBinding(TextBox.TextProperty, binding);
-        this._data.CurrentDirectoryChanged += new PropertyChangedEventHandler(Data_CurrentDirectoryChanged);
+        Data.CurrentDirectoryChanged += new PropertyChangedEventHandler(Data_CurrentDirectoryChanged);
         this.Template = CreateTextBoxTemplate();
         this.Margin = new Thickness{Left = 5.0, Right = 15.0};
         this.CaretBrush = Paint.ForegroundBrush;
@@ -283,21 +271,21 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
     private void LeftArrowButton_Click(object sender, RoutedEventArgs e)
     {
         try {
-            this._data.PrevDirectory();
+            Data.PrevDirectory();
         } catch { }
     }
 
     private void RightArrowButton_Click(object sender, RoutedEventArgs e)
     {
         try {
-            this._data.NextDirectory();
+            Data.NextDirectory();
         } catch { }
     }
 
     private void UpArrowButton_Click(object sender, RoutedEventArgs e)
     {
         try {
-            this._data.CurrentDirectory = this._data.CurrentDirectory.Parent;
+            Data.CurrentDirectory = Data.CurrentDirectory.Parent;
         } catch { }
     }
 
@@ -384,11 +372,9 @@ class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropert
 #region FilerPanel
 class FilerPanel : DataGrid
 {
-    private Data _data;
     private object _lockObject = new object();
-    public FilerPanel(Data data)
+    public FilerPanel()
     {
-        this._data = data;
         Grid.SetRow(this, 1);
         this.Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 15.0};
         this.Background = Brushes.Transparent;
@@ -401,7 +387,7 @@ class FilerPanel : DataGrid
         this.HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden;
         VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
         Binding binding = new Binding() {
-            Source = this._data.FileInfoCollection
+            Source = Data.FileInfoCollection
         };
         this.SetBinding(FilerPanel.ItemsSourceProperty, binding);
         this.ItemContainerStyle = CreateItemContainerStyle();
@@ -454,7 +440,7 @@ class FilerPanel : DataGrid
                 var path = ((FileSystemInfoEntry)((FrameworkElement)e.OriginalSource).DataContext).Path;
                 if (null != path && Directory.Exists(path))
                 {
-                    this._data.CurrentDirectory =  new DirectoryInfo(path);
+                    Data.CurrentDirectory =  new DirectoryInfo(path);
                 }
             } catch { }
         }
@@ -555,7 +541,7 @@ public class CustomStatusBar : StatusBar
 #endregion CustomStatusBar
 
 #region FileSystemInfoEntry
-public class FileSystemInfoEntry : INotifyPropertyChanged
+public class FileSystemInfoEntry
 {
     public BitmapSource _icon;
     public string _name;
@@ -563,6 +549,99 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
     public DateTime _lastWriteTime;
     public bool _isDirectory;
     public bool _hasZoneId;
+
+    public FileSystemInfoEntry(FileSystemInfo fsi)
+    {
+        this._path = fsi.FullName;
+        this._name = fsi.Name;
+        this._lastWriteTime = fsi.LastWriteTime;
+        this._isDirectory = (bool)((fsi.Attributes & FileAttributes.Directory) == FileAttributes.Directory);
+        this._icon = Shell.GetIconBitmapSource(this._path, fsi.Attributes);
+        this._icon.Freeze();
+        if (false == this._isDirectory) {
+            this._hasZoneId = Shell.CheckZoneId(this._path);
+        }
+    }
+
+    public BitmapSource Icon
+    {
+        get { return this._icon; }
+    }
+
+    public String Name
+    {
+        get { return this._name; }
+    }
+
+    public String Path
+    {
+        get { return this._path; }
+    }
+
+    public string HasZoneId
+    {
+        get
+        {
+            if (this._hasZoneId)
+                return "\uE72E";
+            else
+                return String.Empty;
+        }
+    }
+
+    public DateTime LastWriteTime
+    {
+        get { return this._lastWriteTime; }
+    }
+
+    public string LastWriteTimeString
+    {
+        get { return this._lastWriteTime.ToString(); }
+    }
+
+    public bool IsDirectory
+    {
+        get { return _isDirectory; }
+    }
+}
+#endregion FileSystemInfoEntry
+
+public static class Shell
+{
+    private const uint STATUS_BUFFER_OVERFLOW = 0x80000005;
+    private static int SIZE_SHFILEINFO;
+
+    static Shell()
+    {
+        SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
+    }
+
+    [DllImport("ntdll.dll")]
+    private static extern IntPtr NtQueryInformationFile(SafeFileHandle fileHandle, out IO_STATUS_BLOCK IoStatusBlock, IntPtr pInfoBlock, int length, FILE_INFORMATION_CLASS fileInformation);  
+
+    [DllImport("shell32.dll", CharSet=CharSet.Auto)]
+    private static extern IntPtr SHGetFileInfo(string pszPath, FileAttributes dwFileAttributes, out SHFILEINFO psfi, int cbFileInfo, SHGFI uFlags);
+    
+    [DllImport("shell32.dll", CharSet=CharSet.Auto)]
+    private static extern uint ExtractIconEx(string szFileName, int nIconIndex, IntPtr phiconLarge, out IntPtr phiconSmall, int nIcons);
+    
+    [DllImport("user32.dll", EntryPoint="DestroyIcon")]
+    private static extern int DestroyIcon(IntPtr hIcon);
+
+    struct IO_STATUS_BLOCK {
+        internal uint status;
+        internal ulong information;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct FILE_STREAM_INFORMATION {
+        internal int NextEntryOffset;
+        internal int StreamNameLength;
+        internal ulong StreamSize;
+        internal ulong StreamAllocationSize;
+        [MarshalAsAttribute(UnmanagedType.ByValTStr, SizeConst = 260)]
+        internal string StreamName;
+    }
 
     [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Auto)]
     private struct SHFILEINFO
@@ -584,153 +663,10 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
         UseFileAttributes= 0x000000010,  
     }
 
-    [DllImport("shell32.dll", CharSet=CharSet.Auto)]
-    private static extern IntPtr SHGetFileInfo(string pszPath, FileAttributes dwFileAttributes, out SHFILEINFO psfi, int cbFileInfo, SHGFI uFlags);
-    
-    [DllImport("shell32.dll", CharSet=CharSet.Auto)]
-    private static extern uint ExtractIconEx(string szFileName, int nIconIndex,  out IntPtr phiconLarge, out IntPtr phiconSmall, int nIcons);
-    
-    [DllImport("user32.dll", EntryPoint="DestroyIcon", SetLastError=true)]
-    private static extern int DestroyIcon(IntPtr hIcon);
-
-    public FileSystemInfoEntry(FileSystemInfo fsi)
-    {
-        this._path = fsi.FullName;
-        this._name = fsi.Name;
-        this._lastWriteTime = fsi.LastWriteTime;
-        this._isDirectory = (bool)((fsi.Attributes & FileAttributes.Directory) == FileAttributes.Directory);
-        this._icon = GetIconBitmapSource(this._path, fsi.Attributes);
-        this._icon.Freeze();
-        if (false == this._isDirectory) {
-            this._hasZoneId = NTFS.CheckZoneId(this._path);
-        }
-    }
-
-    private static BitmapSource GetSystemIcon(int nIconIndex)
-    {
-        try
-        {
-            IntPtr hLIcon = IntPtr.Zero;
-            IntPtr hSIcon = IntPtr.Zero;
-            ExtractIconEx(AppSettings.Shell32, nIconIndex, out hLIcon, out hSIcon, 1);
-
-            var bms = Imaging.CreateBitmapSourceFromHIcon(hSIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-            DestroyIcon(hLIcon);
-            DestroyIcon(hSIcon);
-
-            return bms;
-        } catch { 
-            return BitmapSource.Create(24, 24, 96, 96, PixelFormats.Default, BitmapPalettes.WebPalette, new byte[72], 3);
-        }
-    }
-
-    public static BitmapSource GetIconBitmapSource(string strPath, FileAttributes attr)
-    {
-        SHFILEINFO info = new SHFILEINFO();
-        try {
-            
-            SHGFI flags = SHGFI.Icon | SHGFI.SmallIcon | SHGFI.UseFileAttributes;
-
-            SHGetFileInfo(strPath, attr, out info, Marshal.SizeOf(info), flags);
-        } catch {
-            return GetSystemIcon(0);
-        }
-
-        if (IntPtr.Zero == info.hIcon || null == info.hIcon)
-            return GetSystemIcon(0);
-
-        BitmapSource bms = Imaging.CreateBitmapSourceFromHIcon(info.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-
-        if (null != bms)
-        {
-            DestroyIcon(info.hIcon);
-            return bms;
-        }
-        else
-            return GetSystemIcon(0);
-    }
-
-    public BitmapSource Icon
-    {
-        get { return this._icon; }
-        set { this._icon = value; OnPropertyChanged("Icon"); }
-    }
-
-    public String Name
-    {
-        get { return this._name; }
-        set { this._name = value; OnPropertyChanged("Name"); }
-    }
-
-    public String Path
-    {
-        get { return this._path; }
-        set { this._path = value; OnPropertyChanged("Path"); }
-    }
-
-    public string HasZoneId
-    {
-        get
-        {
-            if (this._hasZoneId)
-                return "\uE72E";
-            else
-                return String.Empty;
-        }
-    }
-
-    public DateTime LastWriteTime
-    {
-        get { return this._lastWriteTime; }
-        set { this._lastWriteTime = value; OnPropertyChanged("LastWriteTime"); }
-    }
-
-    public string LastWriteTimeString
-    {
-        get { return this._lastWriteTime.ToString(); }
-    }
-
-    public bool IsDirectory
-    {
-        get { return _isDirectory; }
-        set { _isDirectory = value; OnPropertyChanged("IsDirectory"); }
-    }
-
-    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
-
-    private void OnPropertyChanged(string info)
-    {
-        PropertyChanged.Invoke(this, new PropertyChangedEventArgs(info));
-    }
-}
-#endregion FileSystemInfoEntry
-
-public static class NTFS 
-{
-    [DllImport("ntdll.dll", SetLastError=true)]
-    private static extern IntPtr NtQueryInformationFile(SafeFileHandle fileHandle, out IO_STATUS_BLOCK IoStatusBlock, IntPtr pInfoBlock, int length, FILE_INFORMATION_CLASS fileInformation);  
-
-    struct IO_STATUS_BLOCK {
-        internal uint status;
-        internal ulong information;
-    }
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    struct FILE_STREAM_INFORMATION {
-        internal int NextEntryOffset;
-        internal int StreamNameLength;
-        internal ulong StreamSize;
-        internal ulong StreamAllocationSize;
-        [MarshalAsAttribute(UnmanagedType.ByValTStr, SizeConst = 260)]
-        internal string StreamName;
-    }
-
     enum FILE_INFORMATION_CLASS {
         FileDirectoryInformation = 1,     // 1
         FileStreamInformation = 22,       // 22
     }
-
-    private const uint STATUS_BUFFER_OVERFLOW = 0x80000005;
 
     public static bool CheckZoneId(string path) {
         bool result = false;
@@ -781,6 +717,46 @@ public static class NTFS
             if(buffer != IntPtr.Zero) { Marshal.FreeCoTaskMem(buffer); }
         }
         return result;
+    }
+
+    private static BitmapSource GetSystemIcon(int nIconIndex)
+    {
+        try
+        {
+            //IntPtr hLIcon = IntPtr.Zero;
+            IntPtr hSIcon = IntPtr.Zero;
+            ExtractIconEx("shell32.dll", nIconIndex, IntPtr.Zero, out hSIcon, 1);
+            var bms = Imaging.CreateBitmapSourceFromHIcon(hSIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+            //DestroyIcon(hLIcon);
+            DestroyIcon(hSIcon);
+
+            return bms;
+        } catch { 
+            return BitmapSource.Create(24, 24, 96, 96, PixelFormats.Default, BitmapPalettes.WebPalette, new byte[72], 3);
+        }
+    }
+
+    public static BitmapSource GetIconBitmapSource(string strPath, FileAttributes attr)
+    {
+        SHFILEINFO info = new SHFILEINFO();
+        try {
+            SHGetFileInfo(strPath, attr, out info, SIZE_SHFILEINFO, (SHGFI.Icon | SHGFI.SmallIcon | SHGFI.UseFileAttributes));
+        } catch {
+            return GetSystemIcon(0);
+        }
+
+        if (IntPtr.Zero == info.hIcon || null == info.hIcon)
+            return GetSystemIcon(0);
+
+        BitmapSource bms = Imaging.CreateBitmapSourceFromHIcon(info.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+
+        if (null != bms)
+        {
+            DestroyIcon(info.hIcon);
+            return bms;
+        }
+        else
+            return GetSystemIcon(0);
     }
 }
 
@@ -877,22 +853,21 @@ class CustomTrack : Track, INotifyPropertyChanged
 #endregion CustomTrack
 
 #region Data
-public class Data
+public static class Data
 {
-    public ObservableCollection<FileSystemInfoEntry> FileInfoCollection;
-    public object _lockObject;
-    public CancellationTokenSource cTokenSource = null;
-    public MainWindow mainWindow;
+    public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection;
+    public static object _lockObject;
+    public static CancellationTokenSource cTokenSource = null;
 
-    public Data()
+    static Data()
     {
-        this._lockObject = new object();
-        this.FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
-        BindingOperations.EnableCollectionSynchronization(this.FileInfoCollection,this._lockObject);
+        _lockObject = new object();
+        FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
+        BindingOperations.EnableCollectionSynchronization(FileInfoCollection, _lockObject);
     }
 
-    public DirectoryInfo _currentDirectory;
-    public DirectoryInfo CurrentDirectory
+    public static DirectoryInfo _currentDirectory;
+    public static DirectoryInfo CurrentDirectory
     {
         get
         {
@@ -924,85 +899,87 @@ public class Data
         }
     }
 
-    private StringCollection _prevDirectories = new StringCollection();
-    private StringCollection _nextDirectories = new StringCollection();
-    public void PrevDirectory()
+    private static StringCollection _prevDirectories = new StringCollection();
+    private static StringCollection _nextDirectories = new StringCollection();
+    public static void PrevDirectory()
     {
         if (0 < _prevDirectories.Count)
         {
-            string path = this._prevDirectories[this._prevDirectories.Count - 1];
-            this._prevDirectories.RemoveAt(this._prevDirectories.Count - 1);
-            this._nextDirectories.Add(CurrentDirectory.FullName);
-            this._currentDirectory = new DirectoryInfo(path);
+            string path = _prevDirectories[_prevDirectories.Count - 1];
+            _prevDirectories.RemoveAt(_prevDirectories.Count - 1);
+            _nextDirectories.Add(CurrentDirectory.FullName);
+            _currentDirectory = new DirectoryInfo(path);
             OnCurrentDirectoryChanged();
         }
     }
 
-    public void NextDirectory()
+    public static void NextDirectory()
     {
         if (0 < _nextDirectories.Count)
         {
-            string path = this._nextDirectories[this._nextDirectories.Count - 1];
-            this._nextDirectories.RemoveAt(this._nextDirectories.Count - 1);
-            this._prevDirectories.Add(CurrentDirectory.FullName);
-            this._currentDirectory = new DirectoryInfo(path);
+            string path = _nextDirectories[_nextDirectories.Count - 1];
+            _nextDirectories.RemoveAt(_nextDirectories.Count - 1);
+            _prevDirectories.Add(CurrentDirectory.FullName);
+            _currentDirectory = new DirectoryInfo(path);
             OnCurrentDirectoryChanged();
         }
     }
 
-    public event PropertyChangedEventHandler CurrentDirectoryChanged = (sender, e) => { };
+    public static event PropertyChangedEventHandler CurrentDirectoryChanged = (sender, e) => { };
 
-    public async void OnCurrentDirectoryChanged()
+    public static async void OnCurrentDirectoryChanged()
     {
-        this.CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
+        CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
 
-        if (!(this.CurrentDirectory.Exists))
+        if (!(CurrentDirectory.Exists))
         {
             return;
         }
 
         if (null != cTokenSource)
         {
-            this.cTokenSource.Cancel();
+            cTokenSource.Cancel();
         }
 
-        lock (this._lockObject)
+        lock (_lockObject)
         {
-            this.FileInfoCollection.Clear();
+            FileInfoCollection.Clear();
+        }
+
+        if (null == cTokenSource)
+        {
+            cTokenSource = new CancellationTokenSource();
+        }
+        else
+        {
+            cTokenSource.Dispose();
+            cTokenSource = new CancellationTokenSource();
         }
 
         await GetCollectionAsync();
     }
 
-    public Task GetCollectionAsync()
+    public static Task GetCollectionAsync()
     {
-        if (null == cTokenSource)
-        {
-            this.cTokenSource = new CancellationTokenSource();
-        }
-        else
-        {
-            this.cTokenSource.Dispose();
-            this.cTokenSource = new CancellationTokenSource();
-        }
-        CancellationToken token = this.cTokenSource.Token;
-        return Task.Run(() => GetCollection(token), this.cTokenSource.Token).ContinueWith(t => {
-            this.cTokenSource.Dispose();
-            this.cTokenSource = null;
+        CancellationToken token = cTokenSource.Token;
+        return Task.Run(() => GetCollection(token), cTokenSource.Token).ContinueWith(t => {
+            cTokenSource.Dispose();
+            cTokenSource = null;
         });
     }
 
-    public void GetCollection(CancellationToken token)
+    public static void GetCollection(CancellationToken token)
     {
-        lock (this._lockObject)
+        lock (_lockObject)
         {
-            foreach (var info in this.CurrentDirectory.EnumerateFileSystemInfos())
+            foreach (var info in CurrentDirectory.EnumerateFileSystemInfos())
             {
                 if (token.IsCancellationRequested)
                 {
-                    token.ThrowIfCancellationRequested();
+                    //token.ThrowIfCancellationRequested();
+                    break;
                 }
-                this.FileInfoCollection.Add(new FileSystemInfoEntry(info));
+                FileInfoCollection.Add(new FileSystemInfoEntry(info));
             }
         }
     }
@@ -1037,18 +1014,6 @@ static public class AppSettings
     [DllImport("shell32.dll", CharSet=CharSet.Auto)]
     private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint dwFlags, IntPtr hToken, out string pszPath);
     
-    private static string _shell32;
-    public static string Shell32
-    {
-        get
-        {
-            if (null == _shell32)
-                _shell32 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "shell32.dll");
-
-            return _shell32;
-        }
-    }
-
     private static readonly Guid Downloads = new Guid("374DE290-123F-4565-9164-39C4925E467B");
     private static string _downloadFolder = ConfigurationManager.AppSettings["DownloadFolder"];
     public static string DownloadFolder{
