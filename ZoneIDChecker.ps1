@@ -101,6 +101,7 @@ public class Paint
     public static Brush ProgressedMouseOverBrush = new SolidColorBrush(ProgressedMouseOverColor);
 
     public static FontFamily IconFontFamily = new FontFamily("Segoe MDL2 Assets");
+    public static FontFamily textFontFamily = new FontFamily("Meiryo");
 }
 #endregion
 
@@ -125,7 +126,9 @@ public class MainWindow : System.Windows.Window
         this.Loaded += (sender, e) => {this.Topmost = false;};
         this.Resources = new CustomResourceDictionary();
 
-        this._data = new Data();
+        this._data = new Data{
+            mainWindow = this,
+        };
         this.Content = new MainGrid(this._data);
     }
 
@@ -188,7 +191,6 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
 
     private void OnCurrentDirectoryChanging()
     {
-        Console.WriteLine("OnCurrentDirectoryChanging");
         if (Directory.Exists(this._strCurrentDirectory)) {
             this._data.CurrentDirectory = new DirectoryInfo(this._strCurrentDirectory);
         }
@@ -210,6 +212,8 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
         this.CaretBrush = Paint.ForegroundBrush;
         this.Foreground = Paint.ForegroundBrush;
         this.FontSize = 16.0;
+
+        this.KeyDown += new KeyEventHandler(TextBox_KeyDown);
     }
 
     private void Data_CurrentDirectoryChanged(object sender, PropertyChangedEventArgs e)
@@ -222,29 +226,39 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
         var scrollViewer = new FrameworkElementFactory(typeof(ScrollViewer), "PART_ContentHost");
         scrollViewer.SetValue(ScrollViewer.VerticalAlignmentProperty, VerticalAlignment.Center);
         scrollViewer.SetValue(ScrollViewer.VerticalContentAlignmentProperty, VerticalAlignment.Center);
-        scrollViewer.SetValue(ScrollViewer.MarginProperty, new Thickness{Left = 15.0, Right = 15.0, Top = 0.0, Bottom = 0.0});
+        scrollViewer.SetValue(ScrollViewer.MarginProperty, new Thickness{Left = 15.0, Right = 5.0, Top = 0.0, Bottom = 0.0});
+        scrollViewer.SetValue(DockPanel.DockProperty, Dock.Left);
+
+        var reloadButton = new FrameworkElementFactory(typeof(TileButton));
+        reloadButton.SetValue(TileButton.ContentProperty, "\uE149");
+        reloadButton.SetValue(Button.MarginProperty, new Thickness{Left = 0.0, Right = 0.0});
+        reloadButton.SetValue(DockPanel.DockProperty, Dock.Right);
+
+        var inlinePanel = new FrameworkElementFactory(typeof(DockPanel));
+        //inlinePanel.SetValue(DockPanel.BackgroundProperty, Paint.BlueBrush);
+        inlinePanel.AppendChild(reloadButton);
+        inlinePanel.AppendChild(scrollViewer);
 
         var border = new FrameworkElementFactory(typeof(Border));
         border.SetValue(Border.BorderThicknessProperty, new Thickness(1.0));
         border.SetValue(Border.BorderBrushProperty, Paint.TextBoxBorderBrush);
         border.SetValue(Border.HeightProperty, 35.0);
         border.SetValue(Border.CornerRadiusProperty, new CornerRadius(17.5));
-        border.SetValue(DockPanel.DockProperty, Dock.Right);
-        border.AppendChild(scrollViewer);
+        border.AppendChild(inlinePanel);
 
         var leftArrowButton = new FrameworkElementFactory(typeof(TileButton));
         leftArrowButton.SetValue(TileButton.ContentProperty, "\uE0A6");
-        leftArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+        leftArrowButton.SetValue(Button.MarginProperty, new Thickness{Left = 10.0, Right = 5.0});
         leftArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(LeftArrowButton_Click));
 
         var rightArrowButton = new FrameworkElementFactory(typeof(TileButton));
         rightArrowButton.SetValue(TileButton.ContentProperty, "\uE0AB");
-        rightArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+        rightArrowButton.SetValue(Button.MarginProperty, new Thickness{Left = 5.0, Right = 5.0});
         rightArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(RightArrowButton_Click));
 
         var upArrowButton = new FrameworkElementFactory(typeof(TileButton));
         upArrowButton.SetValue(TileButton.ContentProperty, "\uE110");
-        upArrowButton.SetValue(TileButton.VerticalAlignmentProperty, VerticalAlignment.Center);
+        upArrowButton.SetValue(Button.MarginProperty, new Thickness{Left = 5.0, Right = 10.0});
         upArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(UpArrowButton_Click));
 
         var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
@@ -286,6 +300,20 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
             this._data.CurrentDirectory = this._data.CurrentDirectory.Parent;
         } catch { }
     }
+
+    private void TextBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        try {
+            var be = BindingOperations.GetBindingExpression((NavigatePanel)sender, TextBox.TextProperty);
+            be.UpdateSource();
+            Keyboard.ClearFocus();
+        } catch { }
+    }
 }
 #endregion NavigatePanel
 
@@ -301,9 +329,10 @@ class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropert
     public TileButton()
     {
         this.Template = CreateTileButtonTemplate();
-        this.Margin = new Thickness{Left = 5.0, Right = 5.0};
+        this.VerticalAlignment = VerticalAlignment.Center;
         this.Foreground = Paint.ForegroundBrush;
         this.FontFamily = Paint.IconFontFamily;
+        this.FontWeight = FontWeights.Medium;
         this.FontSize = 15.0;
         this.MouseEnter += new MouseEventHandler(TileButton_MouseEnter);
         this.MouseLeave += new MouseEventHandler(TileButton_MouseLeave);
@@ -320,9 +349,9 @@ class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropert
             Source = this,
         };
         border.SetBinding(Border.BackgroundProperty, binding);
-        border.SetValue(Border.HeightProperty, 30.0);
-        border.SetValue(Border.WidthProperty, 30.0);
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(15));
+        border.SetValue(Border.HeightProperty, 32.0);
+        border.SetValue(Border.WidthProperty, 32.0);
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(16));
         border.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Center);
         border.SetValue(Border.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         border.AppendChild(contentPresenter);
@@ -365,12 +394,12 @@ class FilerPanel : DataGrid
         this.Background = Brushes.Transparent;
         this.Foreground = Paint.ForegroundBrush;
         this.FontSize = 15.0;
+        this.FontFamily = Paint.textFontFamily;
         this.BorderThickness = new Thickness(0.0);
         this.AutoGenerateColumns = false;
         this.HeadersVisibility = DataGridHeadersVisibility.Column;
         this.HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden;
         VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
-        //this.DataContext = this._data;
         Binding binding = new Binding() {
             Source = this._data.FileInfoCollection
         };
@@ -392,6 +421,7 @@ class FilerPanel : DataGrid
         this.Columns.Add(new DataGridTemplateColumn{
             Header = "Zone.Identifier",
             CellTemplate = CreateZoneIdCellTemplate(),
+            Width = new DataGridLength(150.0),
             MinWidth = 50.0,
             IsReadOnly = true,
             CanUserSort = true
@@ -400,6 +430,7 @@ class FilerPanel : DataGrid
         this.Columns.Add(new DataGridTextColumn{
             Header = "LastWriteTime",
             Binding = new Binding("LastWriteTimeString"),
+            Width = new DataGridLength(200.0),
             MinWidth = 50.0,
             ElementStyle = CreateTextBlockStyle(),
             IsReadOnly = true,
@@ -407,7 +438,8 @@ class FilerPanel : DataGrid
         });
 
         this.Columns.Add(new DataGridTextColumn{
-            Width = new DataGridLength(20.0),
+            //Width = new DataGridLength(50.0),
+            ElementStyle = CreateTextBlockStyle(),
             IsReadOnly = true,
         });
 
@@ -435,20 +467,22 @@ class FilerPanel : DataGrid
         icon.SetValue(Image.HeightProperty, 16.0);
         icon.SetValue(Image.MarginProperty, new Thickness{Left = 5.0, Right = 5.0});
         icon.SetBinding(Image.SourceProperty, new Binding("Icon"));
+        icon.SetValue(DockPanel.DockProperty, Dock.Left);
 
         var name = new FrameworkElementFactory(typeof(TextBlock));
         name.SetValue(TextBlock.MarginProperty, new Thickness{Left = 5.0, Right = 5.0});
         name.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
         name.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         name.SetBinding(TextBlock.TextProperty, new Binding("Name"));
+        name.SetValue(DockPanel.DockProperty, Dock.Right);
         
-        var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
-        stackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-        stackPanel.AppendChild(icon);
-        stackPanel.AppendChild(name);
+        var dockPanel = new FrameworkElementFactory(typeof(DockPanel));
+        //stackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        dockPanel.AppendChild(icon);
+        dockPanel.AppendChild(name);
 
         var template = new DataTemplate{
-            VisualTree = stackPanel
+            VisualTree = dockPanel
         };
         return template;
     }
@@ -457,9 +491,9 @@ class FilerPanel : DataGrid
     {
         var check = new FrameworkElementFactory(typeof(TextBlock));
         check.SetValue(TextBlock.TextProperty, new Binding("HasZoneId"));
-        check.SetValue(TextBlock.MarginProperty, new Thickness{Left = 5.0, Right = 5.0});
+        check.SetValue(TextBlock.MarginProperty, new Thickness{Left = 55.0});
         check.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-        check.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
+        //check.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
         check.SetValue(TextBlock.FontSizeProperty, 18.0);
         check.SetValue(TextBlock.FontFamilyProperty, Paint.IconFontFamily);
 
@@ -472,9 +506,12 @@ class FilerPanel : DataGrid
     private Style CreateColumnHeaderStyle()
     {
         var style = new Style();
+        style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness{Right = 1.0}));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Paint.GrayBrush));
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         style.Setters.Add(new Setter(Control.FontSizeProperty, 16.0));
-        style.Setters.Add(new Setter(Control.MarginProperty, new Thickness{Left = 10, Right = 10, Bottom = 15.0}));
+        style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Medium));
+        style.Setters.Add(new Setter(Control.MarginProperty, new Thickness{Left = 15.0, Bottom = 15.0}));
         return style;
     }
 
@@ -482,7 +519,7 @@ class FilerPanel : DataGrid
     {
         var style = new Style();
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0.0)));
-        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness{Left = 10.0, Right = 10.0}));
+        //style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness{Left = 10.0, Right = 10.0}));
         return style;
     }
 
@@ -491,14 +528,14 @@ class FilerPanel : DataGrid
         var style = new Style();
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         style.Setters.Add(new Setter(Control.HeightProperty, 40.0));
-        style.Setters.Add(new Setter(Control.MarginProperty, new Thickness{Top = 1.0, Bottom = 1.0}));
+        //style.Setters.Add(new Setter(Control.MarginProperty, new Thickness{Top = 1.0, Bottom = 1.0}));
         return style;
     }
 
     private Style CreateTextBlockStyle()
     {
         var style = new Style();
-        style.Setters.Add(new Setter(TextBlock.MarginProperty, new Thickness{Left = 5.0, Right = 5.0}));
+        //style.Setters.Add(new Setter(TextBlock.PaddingProperty, new Thickness{Left = 5.0, Right = 5.0}));
         style.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
         style.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center));
         return style;
@@ -690,7 +727,7 @@ public static class NTFS
 
     enum FILE_INFORMATION_CLASS {
         FileDirectoryInformation = 1,     // 1
-        FileStreamInformation = 22,        // 22
+        FileStreamInformation = 22,       // 22
     }
 
     private const uint STATUS_BUFFER_OVERFLOW = 0x80000005;
@@ -777,6 +814,7 @@ class CustomResourceDictionary : ResourceDictionary
     private Style CreateCustomScrollBarStyle()
     {
         var style = new Style(typeof(ScrollBar));
+        style.Setters.Add(new Setter(ScrollBar.MarginProperty, new Thickness{Left = 5.0}));
         style.Setters.Add(new Setter(ScrollBar.TemplateProperty, this["ScrollBarControlTemplate"]));
         return style;
     }
@@ -793,7 +831,6 @@ class CustomTrack : Track, INotifyPropertyChanged
         set { _borderMargin = value; OnPropertyChanged("BorderMargin"); }
     }
 
-
     public CustomTrack()
     {
         this.Thumb = new Thumb{
@@ -809,10 +846,10 @@ class CustomTrack : Track, INotifyPropertyChanged
         var border = new FrameworkElementFactory(typeof(Border));
 
         border.SetValue(Border.BackgroundProperty, Paint.GrayBrush);
-        var binding = new Binding("BorderMargin"){
+        var bindingBorderMargin = new Binding("BorderMargin"){
             Source = this,
         };
-        border.SetBinding(Border.MarginProperty, binding);
+        border.SetBinding(Border.MarginProperty, bindingBorderMargin);
         border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
         
         var ct = new ControlTemplate(typeof(Thumb)){
@@ -845,6 +882,7 @@ public class Data
     public ObservableCollection<FileSystemInfoEntry> FileInfoCollection;
     public object _lockObject;
     public CancellationTokenSource cTokenSource = null;
+    public MainWindow mainWindow;
 
     public Data()
     {
