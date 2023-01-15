@@ -45,6 +45,7 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Interop;
 using System.Windows.Controls;
@@ -73,7 +74,7 @@ public class Paint
     public static Brush BlueBrush = new SolidColorBrush(Colors.Aqua);
     public static Brush GrayBrush = new SolidColorBrush(Colors.Gray);
 
-    public static Color GrayBorderColor = new Color{A =255, R =65, G = 65, B =65};
+    public static Color GrayBorderColor = new Color{A =255, R =75, G = 75, B = 75};
     public static Brush GrayBorderBrush = new SolidColorBrush(GrayBorderColor);
 
     public static Color TextBoxBackgroundColor = new Color{A =255, R = 30, G = 30, B = 30};
@@ -103,13 +104,47 @@ public class Paint
     public static Color OperationButtonMouseOverBackgroundColor = new Color {A = 255, R = 10, G = 140, B = 240};
     public static Brush OperationButtonMouseOverBackgroundBrush = new SolidColorBrush(OperationButtonMouseOverBackgroundColor);
 
+    public static Color ToggleButtonBackgroundColor = new Color {A = 255, R = 80, G = 80, B = 80};
+    public static Brush ToggleButtonBackgroundBrush = new SolidColorBrush(ToggleButtonBackgroundColor);
+
+    public static Color ToggleButtonMouseOverBackgroundColor = new Color {A = 255, R = 90, G = 90, B = 90};
+    public static Brush ToggleButtonMouseOverBackgroundBrush = new SolidColorBrush(ToggleButtonMouseOverBackgroundColor);
+
+    public static Color ToggleButtonEnabledBackgroundColor = new Color {A = 255, R = 0, G = 120, B = 220};
+    public static Brush ToggleButtonEnabledBackgroundBrush = new SolidColorBrush(ToggleButtonEnabledBackgroundColor);
+
+    public static Color ToggleButtonEnabledMouseOverBackgroundColor = new Color {A = 255, R = 10, G = 140, B = 240};
+    public static Brush ToggleButtonEnabledMouseOverBackgroundBrush = new SolidColorBrush(ToggleButtonEnabledMouseOverBackgroundColor);
+
     public static FontFamily IconFontFamily = new FontFamily("Segoe MDL2 Assets");
     public static FontFamily textFontFamily = new FontFamily("Meiryo");
+
+    public static DoubleAnimation ToggleOnXAnimation = new DoubleAnimation{
+        From = 0.0,
+        To = 20.0,
+        Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
+    };
+
+    public static DoubleAnimation ToggleOffXAnimation = new DoubleAnimation{
+        From = 20.0,
+        To = 0.0,
+        Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
+    };
+    
+    static Paint()
+    {
+        Storyboard.SetTargetName(ToggleOnXAnimation, "ToggleSwitchTransform");
+        Storyboard.SetTargetProperty(ToggleOnXAnimation, new PropertyPath(TranslateTransform.XProperty));
+
+        Storyboard.SetTargetName(ToggleOffXAnimation, "ToggleSwitchTransform");
+        Storyboard.SetTargetProperty(ToggleOffXAnimation, new PropertyPath(TranslateTransform.XProperty));
+    }
+
 }
 #endregion
 
 #region MainWindow
-public class MainWindow : System.Windows.Window
+public class MainWindow : Window
 {
     public MainWindow()
     {
@@ -206,6 +241,7 @@ class OperationPanel : Grid
     private TextBlock _selectedItemNameTextBlock;
     private TextBlock  _selectedItemsCountTextBlock;
     private FilerPanel _filer;
+    private bool _recurseMode = false;
 
     public OperationPanel(FilerPanel filer)
     {
@@ -256,20 +292,41 @@ class OperationPanel : Grid
         };
         SetColumn(border, 1);
 
-        var removeZoneIdButton = new CustomButton("Remove Zone.Id"){
-            Margin = new Thickness{Left = 20.0, Right = 20.0}
+        var removeZoneIdButton = new CustomButton("Unblock"){
+            Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 2.0, Bottom = 2.0}
         };
         SetColumn(removeZoneIdButton, 2);
         removeZoneIdButton.Click += new RoutedEventHandler(RemoveZoneIdButton_Click);
 
+        var recurseToggleButton = new CustomToggleButton("Recurse"){
+            Padding = new Thickness{Left = 10.0, Right = 10.0},
+            Margin = new Thickness{Left = 10.0, Right = 10.0}
+        };
+        this._recurseMode = recurseToggleButton.ToggleState;
+        SetColumn(recurseToggleButton, 3);
+        recurseToggleButton.Click += new RoutedEventHandler(RecurseToggleButton_Click);
+
         this.Children.Add(label);
         this.Children.Add(border);
         this.Children.Add(removeZoneIdButton);
+        this.Children.Add(recurseToggleButton);
     }
 
     private void RemoveZoneIdButton_Click(object sender, RoutedEventArgs e)
     {
-        Data.OnRequestRemoveZoneId(this._filer);
+        Data.OnRequestRemoveZoneId(this._filer, this._recurseMode);
+    }
+
+    private void RecurseToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            this._recurseMode = ((CustomToggleButton)sender).Toggle();
+        }
+        catch (Exception excp)
+        {
+            Console.WriteLine(excp.Message);
+        }
     }
 
     public void SetSelectedItemText(string nameText, string countText)
@@ -283,33 +340,24 @@ class OperationPanel : Grid
 #region CustomButton
 public class CustomButton : ButtonBase
 {
-    //private TextBlock _textBlock;
-    //private Brush _backgroundBrush = Paint.ButtonBackgroundBrush;
-    //private Brush _mouseOverBackgroundBrush = Paint.MouseOverBackgroundBrush;
-
     public CustomButton(string caption)
     {
-        //this.Margin = new Thickness{Right = 15.0, Top = 10.0, Bottom = 0.0};
         this.Template = CreateControlTemplate(caption);
         this.Cursor = Cursors.Hand;
-        //this.MouseEnter += new MouseEventHandler(CustomButton_MouseEnter);
-        //this.MouseLeave += new MouseEventHandler(CustomButton_MouseLeave);
-        //this.PreviewMouseLeftButtonDown += new MouseButtonEventHandler(CustomButton_MouseLeftButtonDown);
-        //this.PreviewMouseLeftButtonUp += new MouseButtonEventHandler(CustomButton_MouseLeftButtonUp);
     }
 
     private static ControlTemplate CreateControlTemplate(string caption)
     {
         var textBlock = new FrameworkElementFactory(typeof(TextBlock));
-        textBlock.SetValue(TextBlock.PaddingProperty, new Thickness(15.0, 10.0, 15.0, 10.0));
         textBlock.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-        textBlock.SetValue(TextBlock.FontSizeProperty, 16.0);
+        textBlock.SetValue(TextBlock.FontSizeProperty, 17.0);
         textBlock.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
         textBlock.SetValue(TextBlock.ForegroundProperty, Paint.ForegroundBrush);
         textBlock.SetValue(TextBlock.TextProperty, caption);
         
         var border = new FrameworkElementFactory(typeof(Border), "border");
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
+        border.SetValue(Border.PaddingProperty, new Thickness(35.0, 0.0, 35.0, 0.0));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4.0));
         border.SetValue(Border.BackgroundProperty, Paint.OperationButtonBrush);
 
         border.AppendChild(textBlock);
@@ -326,34 +374,117 @@ public class CustomButton : ButtonBase
 
         return template;
     }
-
-    /*public void SetBackground(Brush background, Brush mouseover)
-    {
-        this._backgroundBrush = background;
-        this._mouseOverBackgroundBrush = mouseover;
-    }
-
-    private void CustomButton_MouseEnter(object sender, MouseEventArgs e)
-    {
-        this._textBlock.Background = this._mouseOverBackgroundBrush;
-    }
-
-    private void CustomButton_MouseLeave(object sender, MouseEventArgs e)
-    {
-        this._textBlock.Background = this._backgroundBrush;
-    }
-
-    private void CustomButton_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        this._textBlock.Background = this._backgroundBrush;
-    }
-
-    private void CustomButton_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        this._textBlock.Background = this._mouseOverBackgroundBrush;
-    }*/
 }
 #endregion CustomButton
+
+#region CustomToggleButton
+public class CustomToggleButton : ButtonBase
+{
+    private bool _toggleSwitch = false;
+    public bool ToggleState{ get { return this._toggleSwitch; }}
+    private Border _border;
+    private TranslateTransform _toggleSwitchTransform = new TranslateTransform();
+    private Storyboard _toggleOnAnimationStoryboard = new Storyboard();
+    private Storyboard _toggleOffAnimationStoryboard = new Storyboard();
+
+    public CustomToggleButton(string caption)
+    {
+        InitializeComponent(caption);
+        this.Cursor = Cursors.Hand;
+
+        NameScope.SetNameScope(this, new NameScope());
+        this.RegisterName("ToggleSwitchTransform", this._toggleSwitchTransform);
+
+        this._toggleOnAnimationStoryboard.Children.Add(Paint.ToggleOnXAnimation);
+        this._toggleOffAnimationStoryboard.Children.Add(Paint.ToggleOffXAnimation);
+
+        this.MouseEnter += new MouseEventHandler(CustomToggleButton_MouseEnter);
+        this.MouseLeave += new MouseEventHandler(CustomToggleButton_MouseLeave);
+    }
+
+    private void InitializeComponent(string caption)
+    {
+        var toggle = new Border{
+            Height = 16.0,
+            Width = 16.0,
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness{Top = 1.0, Left = 2.0, Right = 2.0},
+            CornerRadius = new CornerRadius(8.5),
+            Background = Paint.ForegroundBrush,
+            RenderTransform = this._toggleSwitchTransform,
+        };
+        
+        this._border = new Border{
+            Height = 20.0,
+            Width = 40.0,
+            CornerRadius = new CornerRadius(10.0),
+            Background = Paint.ToggleButtonBackgroundBrush,
+        };
+        this._border.Child = toggle;
+
+        var textBlock = new TextBlock{
+            Padding = new Thickness(15.0, 10.0, 15.0, 10.0),
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 16.0,
+            TextAlignment = TextAlignment.Center,
+            Foreground = Paint.ForegroundBrush,
+            Text = caption,
+        };
+
+        var stackPanel = new StackPanel{
+            Orientation = Orientation.Horizontal
+        };
+
+        stackPanel.Children.Add(textBlock);
+        stackPanel.Children.Add(this._border);
+
+        this.Content = stackPanel;
+    }
+
+    private void CustomToggleButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        if (this._toggleSwitch) {
+            this._border.Background = Paint.ToggleButtonEnabledMouseOverBackgroundBrush;
+        } else {
+            this._border.Background = Paint.ToggleButtonMouseOverBackgroundBrush;
+        }
+    }
+
+    private void CustomToggleButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        if (this._toggleSwitch) {
+            this._border.Background = Paint.ToggleButtonEnabledBackgroundBrush;
+        } else {
+            this._border.Background = Paint.ToggleButtonBackgroundBrush;
+        }
+    }
+
+
+    public bool Toggle()
+    {
+        if (this._toggleSwitch)
+        {
+            //Console.WriteLine("Off");
+            this._toggleSwitch = false;
+            this._toggleOffAnimationStoryboard.Begin(this);
+            if (this.IsMouseOver)
+                this._border.Background = Paint.ToggleButtonMouseOverBackgroundBrush;
+            else
+                this._border.Background = Paint.ToggleButtonBackgroundBrush;
+        } else {
+            //Console.WriteLine("On");
+            this._toggleSwitch = true;
+            this._toggleOnAnimationStoryboard.Begin(this);
+            if (this.IsMouseOver)
+                this._border.Background = Paint.ToggleButtonEnabledMouseOverBackgroundBrush;
+            else
+                this._border.Background = Paint.ToggleButtonEnabledBackgroundBrush;
+        }
+        return this._toggleSwitch;
+    }
+}
+#endregion CustomToggleButton
 
 #region NavigatePanel
 class NavigatePanel : DockPanel, INotifyPropertyChanged
@@ -636,13 +767,13 @@ class TileButton : ButtonBase, INotifyPropertyChanged
         return ct;
     }
 
-    void TileButton_MouseEnter(object sender, MouseEventArgs e)
+    private void TileButton_MouseEnter(object sender, MouseEventArgs e)
     {
         this.BackgroundBrush = Paint.MouseOverBackgroundBrush;
         this.Foreground = Paint.MouseOverForegroundBrush;
     }
 
-    void TileButton_MouseLeave(object sender, MouseEventArgs e)
+    private void TileButton_MouseLeave(object sender, MouseEventArgs e)
     {
         this.BackgroundBrush = Brushes.Transparent;
         this.Foreground = Paint.ForegroundBrush;
@@ -915,16 +1046,6 @@ public static class Shell
 {
     private static readonly IntPtr STATUS_BUFFER_OVERFLOW = (IntPtr)0x80000005;
     private static readonly int SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
-
-    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    public static extern IntPtr CreateFile(
-        [MarshalAs(UnmanagedType.LPTStr)] string filename,
-        [MarshalAs(UnmanagedType.U4)] FileAccess access,
-        [MarshalAs(UnmanagedType.U4)] FileShare share,
-        IntPtr securityAttributes, // optional SECURITY_ATTRIBUTES struct or IntPtr.Zero
-        [MarshalAs(UnmanagedType.U4)] FileMode creationDisposition,
-        [MarshalAs(UnmanagedType.U4)] FileAttributes flagsAndAttributes,
-        IntPtr templateFile);
 
     [DllImport("ntdll.dll", CharSet=CharSet.Auto)]
     private static extern IntPtr NtQueryInformationFile(SafeFileHandle fileHandle, out IO_STATUS_BLOCK IoStatusBlock, IntPtr pInfoBlock, int length, FILE_INFORMATION_CLASS fileInformation);  
@@ -1319,7 +1440,7 @@ public static class Data
     public delegate void RequestRemoveZoneIdEventHandler(object sender, RequestRemoveZoneIdEventArgs e);
     public static event RequestRemoveZoneIdEventHandler RequestRemoveZoneId = (sender, e) => { };
 
-    public static void OnRequestRemoveZoneId(FilerPanel filer)
+    public static void OnRequestRemoveZoneId(FilerPanel filer, bool recurseMode)
     {
         if (0 == filer.SelectedItems.Count)
         {
@@ -1331,7 +1452,7 @@ public static class Data
             foreach (FileSystemInfoEntry entry in filer.SelectedItems) {
                 fsiList.Add(entry);
             }
-            var ev = new RequestRemoveZoneIdEventArgs(fsiList, false);
+            var ev = new RequestRemoveZoneIdEventArgs(fsiList, recurseMode);
             RequestRemoveZoneId.Invoke(filer, ev);
         }
     }
