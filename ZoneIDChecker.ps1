@@ -158,10 +158,10 @@ class MainGrid : Grid
 
         var naviPanel = new NavigatePanel();
         SetRow(naviPanel, 0);
-        this._opPanel = new OperationPanel();
-        SetRow(this._opPanel, 1);
         var filerPanel = new FilerPanel();
         SetRow(filerPanel, 2);
+        this._opPanel = new OperationPanel(filerPanel);
+        SetRow(this._opPanel, 1);
         var statusBar = new CustomStatusBar();
         SetRow(statusBar, 3);
 
@@ -205,9 +205,11 @@ class OperationPanel : Grid
 {
     private TextBlock _selectedItemNameTextBlock;
     private TextBlock  _selectedItemsCountTextBlock;
+    private FilerPanel _filer;
 
-    public OperationPanel()
+    public OperationPanel(FilerPanel filer)
     {
+        this._filer = filer;
         this.Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 5.0, Bottom = 5.0};
         this.ColumnDefinitions.Add(new ColumnDefinition{Width = GridLength.Auto});
         this.ColumnDefinitions.Add(new ColumnDefinition{Width = new GridLength(1.0, GridUnitType.Star)});
@@ -258,17 +260,22 @@ class OperationPanel : Grid
             Margin = new Thickness{Left = 20.0, Right = 20.0}
         };
         SetColumn(removeZoneIdButton, 2);
+        removeZoneIdButton.Click += new RoutedEventHandler(RemoveZoneIdButton_Click);
 
         this.Children.Add(label);
         this.Children.Add(border);
         this.Children.Add(removeZoneIdButton);
     }
 
+    private void RemoveZoneIdButton_Click(object sender, RoutedEventArgs e)
+    {
+        Data.OnRequestRemoveZoneId(this._filer);
+    }
+
     public void SetSelectedItemText(string nameText, string countText)
     {
         this._selectedItemsCountTextBlock.Text = countText;
         this._selectedItemNameTextBlock.Text = nameText;
-
     }
 }
 #endregion OperationPanel
@@ -651,7 +658,7 @@ class TileButton : ButtonBase, INotifyPropertyChanged
 #endregion TileButton
 
 #region FilerPanel
-class FilerPanel : DataGrid
+public class FilerPanel : DataGrid
 {
     private object _lockObject = new object();
     public FilerPanel()
@@ -821,7 +828,7 @@ public class CustomStatusBar : StatusBar
 #endregion CustomStatusBar
 
 #region FileSystemInfoEntry
-public class FileSystemInfoEntry
+public class FileSystemInfoEntry : INotifyPropertyChanged
 {
     public BitmapSource _icon;
     public string _name;
@@ -843,6 +850,13 @@ public class FileSystemInfoEntry
         }
     }
 
+    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+
+    private void OnPropertyChanged(string info)
+    {
+        PropertyChanged.Invoke(this, new PropertyChangedEventArgs(info));
+    }
+
     public BitmapSource Icon
     {
         get { return this._icon; }
@@ -860,8 +874,12 @@ public class FileSystemInfoEntry
 
     public bool HasZoneId
     {
-        get
-        { return this._hasZoneId; }
+        get { return this._hasZoneId; }
+        set
+        {
+            this._hasZoneId = value;
+            OnPropertyChanged("HasZoneIdIcon");
+        }
     }
 
     public string HasZoneIdIcon
@@ -897,6 +915,16 @@ public static class Shell
 {
     private static readonly IntPtr STATUS_BUFFER_OVERFLOW = (IntPtr)0x80000005;
     private static readonly int SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+    public static extern IntPtr CreateFile(
+        [MarshalAs(UnmanagedType.LPTStr)] string filename,
+        [MarshalAs(UnmanagedType.U4)] FileAccess access,
+        [MarshalAs(UnmanagedType.U4)] FileShare share,
+        IntPtr securityAttributes, // optional SECURITY_ATTRIBUTES struct or IntPtr.Zero
+        [MarshalAs(UnmanagedType.U4)] FileMode creationDisposition,
+        [MarshalAs(UnmanagedType.U4)] FileAttributes flagsAndAttributes,
+        IntPtr templateFile);
 
     [DllImport("ntdll.dll", CharSet=CharSet.Auto)]
     private static extern IntPtr NtQueryInformationFile(SafeFileHandle fileHandle, out IO_STATUS_BLOCK IoStatusBlock, IntPtr pInfoBlock, int length, FILE_INFORMATION_CLASS fileInformation);  
@@ -1136,6 +1164,20 @@ class CustomTrack : Track, INotifyPropertyChanged
 }
 #endregion CustomTrack
 
+#region RequestRemoveZoneIdEventArgs
+public class RequestRemoveZoneIdEventArgs : EventArgs
+{
+    public List<FileSystemInfoEntry> FileSystemInfoList;
+    public bool Recurse;
+
+    public RequestRemoveZoneIdEventArgs(List<FileSystemInfoEntry> fsiList, bool recurse)
+    {
+        this.FileSystemInfoList = fsiList;
+        this.Recurse = recurse;
+    }
+}
+#endregion
+
 #region Data
 public static class Data
 {
@@ -1273,6 +1315,26 @@ public static class Data
             }
         }
     }
+
+    public delegate void RequestRemoveZoneIdEventHandler(object sender, RequestRemoveZoneIdEventArgs e);
+    public static event RequestRemoveZoneIdEventHandler RequestRemoveZoneId = (sender, e) => { };
+
+    public static void OnRequestRemoveZoneId(FilerPanel filer)
+    {
+        if (0 == filer.SelectedItems.Count)
+        {
+            return;
+        }
+        else if (0 < filer.SelectedItems.Count)
+        {
+            List<FileSystemInfoEntry> fsiList = new List<FileSystemInfoEntry>();
+            foreach (FileSystemInfoEntry entry in filer.SelectedItems) {
+                fsiList.Add(entry);
+            }
+            var ev = new RequestRemoveZoneIdEventArgs(fsiList, false);
+            RequestRemoveZoneId.Invoke(filer, ev);
+        }
+    }
 }
 #endregion
 
@@ -1393,6 +1455,38 @@ function Program
 {
     $MainWindow = New-Object MainWindow
     #$MainWindow.SetCurrentDirectory([AppSettings]::DownloadFolder)
+
+    [Data]::add_RequestRemoveZoneId({
+        Param($s, $e)
+        foreach ($entry in $e.FileSystemInfoList)
+        {
+            try
+            {
+                if ($false -eq $entry.IsDirectory)
+                {
+                    Unblock-File -LiteralPath $entry.Path -ErrorAction SilentlyContinue
+                }
+                elseif (($true -eq $e.Recurse) -and $entry.IsDirectory)
+                {
+                    $Items = Get-ChildItem -LiteralPath $entry.Path -Recurse
+                    Unblock-File -LiteralPath $Items.FullName -ErrorAction SilentlyContinue
+                }
+            }
+            catch
+            {
+                Write-Host $_.Exception.Message -f Red
+            }
+            finally
+            {
+                $entry.HasZoneId = [Shell]::CheckZoneId($entry.Path)
+            }
+        }
+
+
+
+        #[Data]::OnCurrentDirectoryChanged()
+    })
+
     $null = $MainWindow.ShowDialog()
     #$MainWindow.Close()
 }
