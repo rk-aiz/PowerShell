@@ -85,8 +85,11 @@ public class Paint
     public static Color ScrollBarBackgroundColor = new Color{A =255, R =40, G = 40, B =40};
     public static Brush ScrollBarBackgroundBrush = new SolidColorBrush(ScrollBarBackgroundColor);
 
-    public static Color MouseOverBackgroundColor = new Color {A = 255, R = 70, G = 70, B = 70};
+    public static Color MouseOverBackgroundColor = new Color {A = 255, R = 50, G = 50, B = 50};
     public static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
+
+    public static Color MouseOverForegroundColor = new Color {A = 255, R = 60, G = 210, B = 255};
+    public static Brush MouseOverForegroundBrush = new SolidColorBrush(MouseOverForegroundColor);
 
     public static Color ButtonBackgroundColor = new Color {A = 255, R = 55, G = 55, B = 55};
     public static Brush ButtonBackgroundBrush = new SolidColorBrush(ButtonBackgroundColor);
@@ -94,11 +97,11 @@ public class Paint
     public static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 85, G = 85, B = 85};
     public static Brush ButtonMouseOverBackgroundBrush = new SolidColorBrush(ButtonMouseOverBackgroundColor);
 
-    public static Color ProgressedColor = new Color {A = 255, R = 25, G = 120, B = 235};
-    public static Brush ProgressedBrush = new SolidColorBrush(ProgressedColor);
+    public static Color OperationButtonColor = new Color {A = 255, R = 0, G = 120, B = 220};
+    public static Brush OperationButtonBrush = new SolidColorBrush(OperationButtonColor);
 
-    public static Color ProgressedMouseOverColor = new Color {A = 255, R = 35, G = 145, B = 255};
-    public static Brush ProgressedMouseOverBrush = new SolidColorBrush(ProgressedMouseOverColor);
+    public static Color OperationButtonMouseOverBackgroundColor = new Color {A = 255, R = 10, G = 140, B = 240};
+    public static Brush OperationButtonMouseOverBackgroundBrush = new SolidColorBrush(OperationButtonMouseOverBackgroundColor);
 
     public static FontFamily IconFontFamily = new FontFamily("Segoe MDL2 Assets");
     public static FontFamily textFontFamily = new FontFamily("Meiryo");
@@ -111,6 +114,7 @@ public class MainWindow : System.Windows.Window
     public MainWindow()
     {
         InitializeComponent();
+        Data.OnCurrentDirectoryChanged();
     }
 
     private void InitializeComponent()
@@ -144,23 +148,212 @@ public class MainWindow : System.Windows.Window
 #region MainGrid
 class MainGrid : Grid
 {
-
+    private OperationPanel _opPanel;
     public MainGrid()
     {
-        this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(60.0), MinHeight = 20.0});
+        this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(60.0)});
+        this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(50.0)});
         this.RowDefinitions.Add(new RowDefinition{MinHeight = 20.0});
         this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(25.0)});
 
-        this.Children.Add(new NavigatePanel());
-        this.Children.Add(new FilerPanel());
-        this.Children.Add(new CustomStatusBar());
+        var naviPanel = new NavigatePanel();
+        SetRow(naviPanel, 0);
+        this._opPanel = new OperationPanel();
+        SetRow(this._opPanel, 1);
+        var filerPanel = new FilerPanel();
+        SetRow(filerPanel, 2);
+        var statusBar = new CustomStatusBar();
+        SetRow(statusBar, 3);
+
+        this.Children.Add(naviPanel);
+        this.Children.Add(this._opPanel);
+        this.Children.Add(filerPanel);
+        this.Children.Add(statusBar);
+
+        filerPanel.SelectionChanged += new SelectionChangedEventHandler(FilerPanel_SelectionChanged);
+    }
+
+    private void FilerPanel_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        //Console.WriteLine("FilerPanel_SelectionChanged");
+        try {
+            FilerPanel filerPanel = (FilerPanel)sender;
+            if (0 == filerPanel.SelectedItems.Count)
+            {
+                this._opPanel.SetSelectedItemText(String.Empty, String.Empty);
+            }
+            else if (1 == filerPanel.SelectedItems.Count)
+            {
+                string nameText = ((FileSystemInfoEntry)filerPanel.SelectedItem).Name;
+                this._opPanel.SetSelectedItemText(nameText, String.Empty);
+            }
+            else
+            {
+                string nameText = String.Format("{0}", ((FileSystemInfoEntry)filerPanel.SelectedItem).Name);
+                string countText = String.Format(" , Total {0} items", (filerPanel.SelectedItems.Count));
+                this._opPanel.SetSelectedItemText(nameText, countText);
+            }
+        } catch (Exception exc) {
+            Console.WriteLine(exc.Message);
+        }
     }
 }
 #endregion MainGrid
 
-#region NavigatePanel
-class NavigatePanel : TextBox, INotifyPropertyChanged
+#region OperationPanel
+class OperationPanel : Grid
 {
+    private TextBlock _selectedItemNameTextBlock;
+    private TextBlock  _selectedItemsCountTextBlock;
+
+    public OperationPanel()
+    {
+        this.Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 5.0, Bottom = 5.0};
+        this.ColumnDefinitions.Add(new ColumnDefinition{Width = GridLength.Auto});
+        this.ColumnDefinitions.Add(new ColumnDefinition{Width = new GridLength(1.0, GridUnitType.Star)});
+        this.ColumnDefinitions.Add(new ColumnDefinition{Width = GridLength.Auto});
+        this.ColumnDefinitions.Add(new ColumnDefinition{Width = GridLength.Auto});
+
+        var label = new Label{
+            Content = "Selected items :",
+            FontSize = 17.0,
+            Foreground = Paint.ForegroundBrush,
+            Margin = new Thickness{Left = 10.0, Right = 10.0},
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        SetColumn(label, 0);
+
+        this._selectedItemsCountTextBlock = new TextBlock{
+            FontSize = 17.0,
+            Foreground = Paint.ForegroundBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        DockPanel.SetDock(this._selectedItemsCountTextBlock, Dock.Right);
+
+        this._selectedItemNameTextBlock = new TextBlock{
+            FontSize = 17.0,
+            Foreground = Paint.ForegroundBrush,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        DockPanel.SetDock(this._selectedItemNameTextBlock, Dock.Left);
+
+        var dockPanel = new DockPanel{
+            HorizontalAlignment = HorizontalAlignment.Left,
+            LastChildFill = false
+        };
+
+        dockPanel.Children.Add(this._selectedItemsCountTextBlock);
+        dockPanel.Children.Add(this._selectedItemNameTextBlock);
+
+        var border = new Border{
+            Margin = new Thickness{Left = 10.0, Right = 10.0},
+            BorderThickness = new Thickness{Bottom = 1.0},
+            BorderBrush = Paint.ForegroundBrush,
+            Child = dockPanel,
+        };
+        SetColumn(border, 1);
+
+        var removeZoneIdButton = new CustomButton("Remove Zone.Id"){
+            Margin = new Thickness{Left = 20.0, Right = 20.0}
+        };
+        SetColumn(removeZoneIdButton, 2);
+
+        this.Children.Add(label);
+        this.Children.Add(border);
+        this.Children.Add(removeZoneIdButton);
+    }
+
+    public void SetSelectedItemText(string nameText, string countText)
+    {
+        this._selectedItemsCountTextBlock.Text = countText;
+        this._selectedItemNameTextBlock.Text = nameText;
+
+    }
+}
+#endregion OperationPanel
+
+#region CustomButton
+public class CustomButton : ButtonBase
+{
+    //private TextBlock _textBlock;
+    //private Brush _backgroundBrush = Paint.ButtonBackgroundBrush;
+    //private Brush _mouseOverBackgroundBrush = Paint.MouseOverBackgroundBrush;
+
+    public CustomButton(string caption)
+    {
+        //this.Margin = new Thickness{Right = 15.0, Top = 10.0, Bottom = 0.0};
+        this.Template = CreateControlTemplate(caption);
+        this.Cursor = Cursors.Hand;
+        //this.MouseEnter += new MouseEventHandler(CustomButton_MouseEnter);
+        //this.MouseLeave += new MouseEventHandler(CustomButton_MouseLeave);
+        //this.PreviewMouseLeftButtonDown += new MouseButtonEventHandler(CustomButton_MouseLeftButtonDown);
+        //this.PreviewMouseLeftButtonUp += new MouseButtonEventHandler(CustomButton_MouseLeftButtonUp);
+    }
+
+    private static ControlTemplate CreateControlTemplate(string caption)
+    {
+        var textBlock = new FrameworkElementFactory(typeof(TextBlock));
+        textBlock.SetValue(TextBlock.PaddingProperty, new Thickness(15.0, 10.0, 15.0, 10.0));
+        textBlock.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        textBlock.SetValue(TextBlock.FontSizeProperty, 16.0);
+        textBlock.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
+        textBlock.SetValue(TextBlock.ForegroundProperty, Paint.ForegroundBrush);
+        textBlock.SetValue(TextBlock.TextProperty, caption);
+        
+        var border = new FrameworkElementFactory(typeof(Border), "border");
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
+        border.SetValue(Border.BackgroundProperty, Paint.OperationButtonBrush);
+
+        border.AppendChild(textBlock);
+
+        var template = new ControlTemplate{
+            VisualTree = border
+        };
+
+        var mouseOverTrigger = new MultiTrigger();
+        mouseOverTrigger.Conditions.Add(new Condition(CustomButton.IsMouseOverProperty, true));
+        mouseOverTrigger.Conditions.Add(new Condition(CustomButton.IsMouseCapturedProperty, false));
+        mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Paint.OperationButtonMouseOverBackgroundBrush, "border"));
+        template.Triggers.Add(mouseOverTrigger);
+
+        return template;
+    }
+
+    /*public void SetBackground(Brush background, Brush mouseover)
+    {
+        this._backgroundBrush = background;
+        this._mouseOverBackgroundBrush = mouseover;
+    }
+
+    private void CustomButton_MouseEnter(object sender, MouseEventArgs e)
+    {
+        this._textBlock.Background = this._mouseOverBackgroundBrush;
+    }
+
+    private void CustomButton_MouseLeave(object sender, MouseEventArgs e)
+    {
+        this._textBlock.Background = this._backgroundBrush;
+    }
+
+    private void CustomButton_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        this._textBlock.Background = this._backgroundBrush;
+    }
+
+    private void CustomButton_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        this._textBlock.Background = this._mouseOverBackgroundBrush;
+    }*/
+}
+#endregion CustomButton
+
+#region NavigatePanel
+class NavigatePanel : DockPanel, INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+    private BindingExpression _textBoxBindingExpression;
+
     public string _strCurrentDirectory;
     public string StrCurrentDirectory
     {
@@ -176,7 +369,27 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
         set { _strCurrentDirectory = value; OnCurrentDirectoryChanging(); }
     }
 
-    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+    private Visibility loadButtonVisibility = Visibility.Collapsed;
+    public Visibility LoadButtonVisibility
+    {
+        get { return this.loadButtonVisibility; }
+        set
+        {
+            this.loadButtonVisibility = value;
+            PropertyChanged.Invoke(this, new PropertyChangedEventArgs("LoadButtonVisibility"));
+        }
+    }
+
+    private Visibility reloadButtonVisibility = Visibility.Visible;
+    public Visibility ReloadButtonVisibility
+    {
+        get { return this.reloadButtonVisibility; }
+        set
+        {
+            this.reloadButtonVisibility = value;
+            PropertyChanged.Invoke(this, new PropertyChangedEventArgs("ReloadButtonVisibility"));
+        }
+    }
 
     private void OnCurrentDirectoryChanging()
     {
@@ -187,21 +400,22 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
 
     public NavigatePanel()
     {
-        Grid.SetRow(this, 0);
-        var binding = new Binding("StrCurrentDirectory"){
-            Source = this,
-            Mode = BindingMode.TwoWay,
-            UpdateSourceTrigger = UpdateSourceTrigger.LostFocus,
-        };
-        SetBinding(TextBox.TextProperty, binding);
-        Data.CurrentDirectoryChanged += new PropertyChangedEventHandler(Data_CurrentDirectoryChanged);
-        this.Template = CreateTextBoxTemplate();
+        InitializeComponent();
         this.Margin = new Thickness{Left = 5.0, Right = 15.0};
-        this.CaretBrush = Paint.ForegroundBrush;
-        this.Foreground = Paint.ForegroundBrush;
-        this.FontSize = 16.0;
 
-        this.KeyDown += new KeyEventHandler(TextBox_KeyDown);
+        Data.CurrentDirectoryChanged += new PropertyChangedEventHandler(Data_CurrentDirectoryChanged);
+    }
+
+    private void NavigatePanel_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        this.LoadButtonVisibility = Visibility.Visible;
+        this.ReloadButtonVisibility = Visibility.Collapsed;
+    }
+
+    private void NavigatePanel_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        this.LoadButtonVisibility = Visibility.Collapsed;
+        this.ReloadButtonVisibility = Visibility.Visible;
     }
 
     private void Data_CurrentDirectoryChanged(object sender, PropertyChangedEventArgs e)
@@ -209,58 +423,102 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
         PropertyChanged.Invoke(this, new PropertyChangedEventArgs("StrCurrentDirectory"));
     }
 
+    private void InitializeComponent()
+    {
+        var textBox = new TextBox{
+            Template = CreateTextBoxTemplate(),
+            Margin = new Thickness{Left = 10.0},
+            CaretBrush = Paint.ForegroundBrush,
+            Foreground = Paint.ForegroundBrush,
+            FontSize = 16.0,
+        };
+        SetDock(textBox, Dock.Left);
+        var textBoxBinding = new Binding("StrCurrentDirectory"){
+            Source = this,
+            Mode = BindingMode.TwoWay,
+            UpdateSourceTrigger = UpdateSourceTrigger.Explicit,
+        };
+        textBox.SetBinding(TextBox.TextProperty, textBoxBinding);
+        this._textBoxBindingExpression = BindingOperations.GetBindingExpression(textBox, TextBox.TextProperty);
+        textBox.KeyDown += new KeyEventHandler(TextBox_KeyDown);
+        textBox.GotKeyboardFocus += new KeyboardFocusChangedEventHandler(NavigatePanel_GotKeyboardFocus);
+        textBox.LostKeyboardFocus += new KeyboardFocusChangedEventHandler(NavigatePanel_LostKeyboardFocus);
+
+        var reloadButton = new TileButton{
+            Content = "\uE149",
+            Margin = new Thickness{Left = 0.0, Right = 2.0},
+        };
+        SetDock(reloadButton, Dock.Right);
+        var reloadButtonVisibilityBinding = new Binding("ReloadButtonVisibility"){
+            Source = this
+        };
+        reloadButton.SetBinding(ButtonBase.VisibilityProperty, reloadButtonVisibilityBinding);
+        reloadButton.Click += new RoutedEventHandler(ReloadButton_Click);
+
+        var inlinePanel = new DockPanel();
+        inlinePanel.Children.Add(reloadButton);
+        inlinePanel.Children.Add(textBox);
+
+        var border = new Border{
+            BorderThickness = new Thickness(1.0),
+            BorderBrush = Paint.TextBoxBorderBrush,
+            Height = 38.0,
+            CornerRadius = new CornerRadius(19.0)
+        };
+        border.Child = inlinePanel;
+
+        var leftArrowButton = new TileButton{
+            Content = "\uE652",
+            Margin = new Thickness{Left = 10.0, Right = 5.0},
+        };
+        leftArrowButton.Click += new RoutedEventHandler(LeftArrowButton_Click);
+
+        var rightArrowButton = new TileButton{
+            Content = "\uE651",
+            Margin = new Thickness{Left = 5.0, Right = 5.0},
+        };
+        rightArrowButton.Click += new RoutedEventHandler(RightArrowButton_Click);
+
+        var upArrowButton = new TileButton{
+            Content = "\uE650",
+            Margin = new Thickness{Left = 5.0, Right = 10.0},
+        };
+        upArrowButton.Click += new RoutedEventHandler(UpArrowButton_Click);
+
+        var stackPanel = new StackPanel{
+            Orientation = Orientation.Horizontal,
+        };
+        stackPanel.Children.Add(leftArrowButton);
+        stackPanel.Children.Add(rightArrowButton);
+        stackPanel.Children.Add(upArrowButton);
+        SetDock(stackPanel, Dock.Left);
+
+        this.Children.Add(stackPanel);
+        this.Children.Add(border);
+    }
+
     private ControlTemplate CreateTextBoxTemplate()
     {
-        var scrollViewer = new FrameworkElementFactory(typeof(ScrollViewer), "PART_ContentHost");
-        scrollViewer.SetValue(ScrollViewer.VerticalAlignmentProperty, VerticalAlignment.Center);
-        scrollViewer.SetValue(ScrollViewer.VerticalContentAlignmentProperty, VerticalAlignment.Center);
-        scrollViewer.SetValue(ScrollViewer.MarginProperty, new Thickness{Left = 15.0, Right = 5.0, Top = 0.0, Bottom = 0.0});
-        scrollViewer.SetValue(DockPanel.DockProperty, Dock.Left);
+        var contentHost = new FrameworkElementFactory(typeof(ScrollViewer), "PART_ContentHost");
+        contentHost.SetValue(ScrollViewer.VerticalAlignmentProperty, VerticalAlignment.Center);
+        contentHost.SetValue(ScrollViewer.MarginProperty, new Thickness(0.0));
+        contentHost.SetValue(ScrollViewer.VerticalContentAlignmentProperty, VerticalAlignment.Center);
+        contentHost.SetValue(DockPanel.DockProperty, Dock.Left);
 
-        var reloadButton = new FrameworkElementFactory(typeof(TileButton));
-        reloadButton.SetValue(TileButton.ContentProperty, "\uE149");
-        reloadButton.SetValue(Button.MarginProperty, new Thickness{Left = 0.0, Right = 0.0});
-        reloadButton.SetValue(DockPanel.DockProperty, Dock.Right);
+        var loadButton = new FrameworkElementFactory(typeof(TileButton));
+        loadButton.SetValue(ButtonBase.ContentProperty, "\uE64D");
+        loadButton.SetValue(ButtonBase.MarginProperty,new Thickness{Left = 0.0, Right = 2.0});
+        loadButton.SetValue(DockPanel.DockProperty, Dock.Right);
 
-        var inlinePanel = new FrameworkElementFactory(typeof(DockPanel));
-        //inlinePanel.SetValue(DockPanel.BackgroundProperty, Paint.BlueBrush);
-        inlinePanel.AppendChild(reloadButton);
-        inlinePanel.AppendChild(scrollViewer);
-
-        var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.BorderThicknessProperty, new Thickness(1.0));
-        border.SetValue(Border.BorderBrushProperty, Paint.TextBoxBorderBrush);
-        border.SetValue(Border.HeightProperty, 35.0);
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(17.5));
-        border.AppendChild(inlinePanel);
-
-        var leftArrowButton = new FrameworkElementFactory(typeof(TileButton));
-        leftArrowButton.SetValue(TileButton.ContentProperty, "\uE0A6");
-        leftArrowButton.SetValue(Button.MarginProperty, new Thickness{Left = 10.0, Right = 5.0});
-        leftArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(LeftArrowButton_Click));
-
-        var rightArrowButton = new FrameworkElementFactory(typeof(TileButton));
-        rightArrowButton.SetValue(TileButton.ContentProperty, "\uE0AB");
-        rightArrowButton.SetValue(Button.MarginProperty, new Thickness{Left = 5.0, Right = 5.0});
-        rightArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(RightArrowButton_Click));
-
-        var upArrowButton = new FrameworkElementFactory(typeof(TileButton));
-        upArrowButton.SetValue(TileButton.ContentProperty, "\uE110");
-        upArrowButton.SetValue(Button.MarginProperty, new Thickness{Left = 5.0, Right = 10.0});
-        upArrowButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(UpArrowButton_Click));
-
-        var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
-        
-        stackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-        stackPanel.SetValue(DockPanel.DockProperty, Dock.Left);
-        stackPanel.AppendChild(leftArrowButton);
-        stackPanel.AppendChild(rightArrowButton);
-        stackPanel.AppendChild(upArrowButton);
+        var loadButtonVisibilityBinding = new Binding("LoadButtonVisibility"){
+            Source = this
+        };
+        loadButton.SetBinding(ButtonBase.VisibilityProperty, loadButtonVisibilityBinding);
+        loadButton.AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(LoadButton_Click));
 
         var dockPanel = new FrameworkElementFactory(typeof(DockPanel));
-
-        dockPanel.AppendChild(stackPanel);
-        dockPanel.AppendChild(border);
+        dockPanel.AppendChild(loadButton);
+        dockPanel.AppendChild(contentHost);
 
         var ct = new ControlTemplate(typeof(TextBox)){
             VisualTree = dockPanel,
@@ -289,16 +547,30 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
         } catch { }
     }
 
+    private void ReloadButton_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            Data.OnCurrentDirectoryChanged();
+        } catch { }
+    }
+
+    private void LoadButton_Click(object sender, RoutedEventArgs e)
+    {
+        RequestLoad();
+    }
+
     private void TextBox_KeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter)
+        if (e.Key == Key.Enter)
         {
-            return;
+            RequestLoad();
         }
+    }
 
+    private void RequestLoad()
+    {
         try {
-            var be = BindingOperations.GetBindingExpression((NavigatePanel)sender, TextBox.TextProperty);
-            be.UpdateSource();
+            this._textBoxBindingExpression.UpdateSource();
             Keyboard.ClearFocus();
         } catch { }
     }
@@ -306,22 +578,29 @@ class NavigatePanel : TextBox, INotifyPropertyChanged
 #endregion NavigatePanel
 
 #region TileButton
-class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropertyChanged
+class TileButton : ButtonBase, INotifyPropertyChanged
 {
-    public Brush _backgroundBrush;
+    public Brush _backgroundBrush = Brushes.Transparent;
     public Brush BackgroundBrush
     {
         get { return this._backgroundBrush; }
         set { this._backgroundBrush = value; OnPropertyChanged("BackgroundBrush"); }
     }
+
+    static TileButton()
+    {
+        DependencyProperty.Register("VisibilityConverter", typeof(bool), typeof(TileButton));
+    }
+
     public TileButton()
     {
         this.Template = CreateTileButtonTemplate();
         this.VerticalAlignment = VerticalAlignment.Center;
         this.Foreground = Paint.ForegroundBrush;
         this.FontFamily = Paint.IconFontFamily;
-        this.FontWeight = FontWeights.Medium;
-        this.FontSize = 15.0;
+        //this.FontWeight = FontWeights.Medium;
+        this.FontSize = 17.0;
+        this.Cursor = Cursors.Hand;
         this.MouseEnter += new MouseEventHandler(TileButton_MouseEnter);
         this.MouseLeave += new MouseEventHandler(TileButton_MouseLeave);
     }
@@ -337,9 +616,9 @@ class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropert
             Source = this,
         };
         border.SetBinding(Border.BackgroundProperty, binding);
-        border.SetValue(Border.HeightProperty, 32.0);
-        border.SetValue(Border.WidthProperty, 32.0);
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(16));
+        border.SetValue(Border.HeightProperty, 30.0);
+        border.SetValue(Border.WidthProperty, 30.0);
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(15));
         border.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Center);
         border.SetValue(Border.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         border.AppendChild(contentPresenter);
@@ -353,11 +632,13 @@ class TileButton : System.Windows.Controls.Primitives.ButtonBase, INotifyPropert
     void TileButton_MouseEnter(object sender, MouseEventArgs e)
     {
         this.BackgroundBrush = Paint.MouseOverBackgroundBrush;
+        this.Foreground = Paint.MouseOverForegroundBrush;
     }
 
     void TileButton_MouseLeave(object sender, MouseEventArgs e)
     {
         this.BackgroundBrush = Brushes.Transparent;
+        this.Foreground = Paint.ForegroundBrush;
     }
 
     public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
@@ -375,7 +656,6 @@ class FilerPanel : DataGrid
     private object _lockObject = new object();
     public FilerPanel()
     {
-        Grid.SetRow(this, 1);
         this.Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 15.0};
         this.Background = Brushes.Transparent;
         this.Foreground = Paint.ForegroundBrush;
@@ -448,7 +728,7 @@ class FilerPanel : DataGrid
         }
     }
 
-    private DataTemplate CreateNameCellTemplate()
+    private static DataTemplate CreateNameCellTemplate()
     {
         var icon = new FrameworkElementFactory(typeof(Image));
         icon.SetValue(Image.WidthProperty, 16.0);
@@ -475,7 +755,7 @@ class FilerPanel : DataGrid
         return template;
     }
 
-    private DataTemplate CreateZoneIdCellTemplate()
+    private static DataTemplate CreateZoneIdCellTemplate()
     {
         var check = new FrameworkElementFactory(typeof(TextBlock));
         check.SetValue(TextBlock.TextProperty, new Binding("HasZoneIdIcon"));
@@ -491,7 +771,7 @@ class FilerPanel : DataGrid
         return template;
     }
 
-    private Style CreateColumnHeaderStyle()
+    private static Style CreateColumnHeaderStyle()
     {
         var style = new Style();
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness{Right = 1.0}));
@@ -503,7 +783,7 @@ class FilerPanel : DataGrid
         return style;
     }
 
-    private Style CreateCellStyle()
+    private static Style CreateCellStyle()
     {
         var style = new Style();
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0.0)));
@@ -511,7 +791,7 @@ class FilerPanel : DataGrid
         return style;
     }
 
-    private Style CreateItemContainerStyle()
+    private static Style CreateItemContainerStyle()
     {
         var style = new Style();
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
@@ -520,7 +800,7 @@ class FilerPanel : DataGrid
         return style;
     }
 
-    private Style CreateTextBlockStyle()
+    private static Style CreateTextBlockStyle()
     {
         var style = new Style();
         style.Setters.Add(new Setter(TextBlock.MarginProperty, new Thickness{Left = 5.0}));
@@ -536,8 +816,6 @@ public class CustomStatusBar : StatusBar
 {
     public CustomStatusBar()
     {
-        Grid.SetColumnSpan(this, 2);
-        Grid.SetRow(this, 2);
     }
 }
 #endregion CustomStatusBar
@@ -614,12 +892,13 @@ public class FileSystemInfoEntry
 }
 #endregion FileSystemInfoEntry
 
+#region Shell
 public static class Shell
 {
     private static readonly IntPtr STATUS_BUFFER_OVERFLOW = (IntPtr)0x80000005;
-    private static int SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
+    private static readonly int SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
 
-    [DllImport("ntdll.dll")]
+    [DllImport("ntdll.dll", CharSet=CharSet.Auto)]
     private static extern IntPtr NtQueryInformationFile(SafeFileHandle fileHandle, out IO_STATUS_BLOCK IoStatusBlock, IntPtr pInfoBlock, int length, FILE_INFORMATION_CLASS fileInformation);  
 
     [DllImport("shell32.dll", CharSet=CharSet.Auto)]
@@ -636,13 +915,13 @@ public static class Shell
         internal ulong information;
     }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
     private struct FILE_STREAM_INFORMATION {
         internal int NextEntryOffset;
         internal int StreamNameLength;
         internal ulong StreamSize;
         internal ulong StreamAllocationSize;
-        [MarshalAsAttribute(UnmanagedType.ByValTStr, SizeConst = 260)]
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
         internal string StreamName;
     }
 
@@ -667,8 +946,8 @@ public static class Shell
     }
 
     enum FILE_INFORMATION_CLASS {
-        FileDirectoryInformation = 1,     // 1
-        FileStreamInformation = 22,       // 22
+        FileDirectoryInformation = 1,
+        FileStreamInformation = 22,
     }
 
     public static bool CheckZoneId(string path) {
@@ -763,6 +1042,7 @@ public static class Shell
             return GetSystemIcon(0);
     }
 }
+#endregion Shell
 
 #region CustomResourceDictionary
 class CustomResourceDictionary : ResourceDictionary
@@ -876,7 +1156,7 @@ public static class Data
         BindingOperations.EnableCollectionSynchronization(FileInfoCollection, _lockObject);
     }
 
-    public static DirectoryInfo _currentDirectory;
+    public static DirectoryInfo _currentDirectory = new DirectoryInfo(AppSettings.DefaultFolder);
     public static DirectoryInfo CurrentDirectory
     {
         get
@@ -999,6 +1279,10 @@ public static class Data
 #region AppSettings
 static public class AppSettings
 {
+    [DllImport("shell32.dll", CharSet=CharSet.Auto)]
+    private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint dwFlags, IntPtr hToken, out string pszPath);
+    private static readonly Guid Downloads = new Guid("374DE290-123F-4565-9164-39C4925E467B");
+
     private static int _historyLimit = 0;
     public static int HistoryLimit{
         get
@@ -1052,10 +1336,6 @@ static public class AppSettings
         }
     }
 
-    [DllImport("shell32.dll", CharSet=CharSet.Auto)]
-    private static extern int SHGetKnownFolderPath([MarshalAs(UnmanagedType.LPStruct)] Guid rfid, uint dwFlags, IntPtr hToken, out string pszPath);
-    
-    private static readonly Guid Downloads = new Guid("374DE290-123F-4565-9164-39C4925E467B");
     private static string _downloadFolder = ConfigurationManager.AppSettings["DownloadFolder"];
     public static string DownloadFolder{
         get
@@ -1087,6 +1367,17 @@ static public class AppSettings
             _desktopFolder = value;
         }
     }
+
+    private static string _defaultFolder = ConfigurationManager.AppSettings["DefaultFolder"];
+    public static string DefaultFolder{
+        get
+        {
+            if (null == _defaultFolder) {
+                _defaultFolder = DownloadFolder;
+            }
+            return _defaultFolder;
+        }
+    }
 }
 #endregion AppSettings
 '@ -ReferencedAssemblies WindowsBase, System.Threading, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
@@ -1101,7 +1392,7 @@ if ($UserDebug) {
 function Program
 {
     $MainWindow = New-Object MainWindow
-    $MainWindow.SetCurrentDirectory([AppSettings]::DownloadFolder)
+    #$MainWindow.SetCurrentDirectory([AppSettings]::DownloadFolder)
     $null = $MainWindow.ShowDialog()
     #$MainWindow.Close()
 }
