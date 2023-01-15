@@ -606,19 +606,19 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
         border.Child = inlinePanel;
 
         var leftArrowButton = new TileButton{
-            Content = "\uE652",
+            Content = "\uF0B0",
             Margin = new Thickness{Left = 10.0, Right = 5.0},
         };
         leftArrowButton.Click += new RoutedEventHandler(LeftArrowButton_Click);
 
         var rightArrowButton = new TileButton{
-            Content = "\uE651",
+            Content = "\uF0AF",
             Margin = new Thickness{Left = 5.0, Right = 5.0},
         };
         rightArrowButton.Click += new RoutedEventHandler(RightArrowButton_Click);
 
         var upArrowButton = new TileButton{
-            Content = "\uE650",
+            Content = "\uF0AD",
             Margin = new Thickness{Left = 5.0, Right = 10.0},
         };
         upArrowButton.Click += new RoutedEventHandler(UpArrowButton_Click);
