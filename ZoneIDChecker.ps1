@@ -154,6 +154,7 @@ public class MainWindow : Window
 
     private void InitializeComponent()
     {
+        this.Title = "Zone.Identifier Checker";
         this.Width = 960.0;
         this.Height = 720.0;
         this.ShowActivated = true;
@@ -170,12 +171,6 @@ public class MainWindow : Window
     public void SetCurrentDirectory(string strCurrentDirectory)
     {
         Data.CurrentDirectory = new DirectoryInfo(strCurrentDirectory);
-    }
-
-    ~MainWindow()
-    {
-        if (true == this.IsVisible)
-            Close();
     }
 }
 #endregion
@@ -224,8 +219,8 @@ class MainGrid : Grid
             }
             else
             {
-                string nameText = String.Format("{0}", ((FileSystemInfoEntry)filerPanel.SelectedItem).Name);
-                string countText = String.Format(" , Total {0} items", (filerPanel.SelectedItems.Count));
+                string nameText = String.Format("{0} ...", ((FileSystemInfoEntry)filerPanel.SelectedItem).Name);
+                string countText = String.Format(" Total {0} items", (filerPanel.SelectedItems.Count));
                 this._opPanel.SetSelectedItemText(nameText, countText);
             }
         } catch (Exception exc) {
@@ -644,7 +639,7 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
         contentHost.SetValue(DockPanel.DockProperty, Dock.Left);
 
         var loadButton = new FrameworkElementFactory(typeof(TileButton));
-        loadButton.SetValue(ButtonBase.ContentProperty, "\uE64D");
+        loadButton.SetValue(ButtonBase.ContentProperty, "\uF0AF");
         loadButton.SetValue(ButtonBase.MarginProperty,new Thickness{Left = 0.0, Right = 2.0});
         loadButton.SetValue(DockPanel.DockProperty, Dock.Right);
 
