@@ -134,7 +134,19 @@ public class Appearance
         To = 0.0,
         Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
     };
-    
+
+    public static ColorAnimation ScrollThumbMouseEnterColorAnimation = new ColorAnimation{
+        From = Colors.Gray,
+        To = new Color {A = 255, R = 200, G = 200, B = 200},
+        Duration = new Duration(TimeSpan.FromMilliseconds(100.0))
+    };
+
+    public static ColorAnimation ScrollThumbMouseLeaveColorAnimation = new ColorAnimation{
+        From = new Color {A = 255, R = 200, G = 200, B = 200},
+        To = Colors.Gray,
+        Duration = new Duration(TimeSpan.FromMilliseconds(100.0))
+    };
+
     static Appearance()
     {
         DirectoryIcon = Shell.GetSystemIcon(3);
@@ -144,6 +156,12 @@ public class Appearance
 
         Storyboard.SetTargetName(ToggleOffXAnimation, "ToggleSwitchTransform");
         Storyboard.SetTargetProperty(ToggleOffXAnimation, new PropertyPath(TranslateTransform.XProperty));
+
+        Storyboard.SetTargetName(ScrollThumbMouseEnterColorAnimation, "ScrollThumbBackgroundColor");
+        Storyboard.SetTargetProperty(ScrollThumbMouseEnterColorAnimation, new PropertyPath(SolidColorBrush.ColorProperty));
+
+        Storyboard.SetTargetName(ScrollThumbMouseLeaveColorAnimation, "ScrollThumbBackgroundColor");
+        Storyboard.SetTargetProperty(ScrollThumbMouseLeaveColorAnimation, new PropertyPath(SolidColorBrush.ColorProperty));
     }
 
 
@@ -794,7 +812,7 @@ public class FilerPanel : DataGrid
     private object _lockObject = new object();
     public FilerPanel()
     {
-        this.Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 15.0};
+        this.Margin = new Thickness{Left = 5.0, Top = 15.0};
         this.Background = Brushes.Transparent;
         this.Foreground = Appearance.ForegroundBrush;
         this.FontSize = 15.0;
@@ -1259,7 +1277,7 @@ class CustomResourceDictionary : ResourceDictionary
         border.SetValue(Border.BackgroundProperty, Appearance.ScrollBarBackgroundBrush);
         border.AppendChild(track);
 
-        var grid = new FrameworkElementFactory(typeof(Grid));
+        var grid = new FrameworkElementFactory(typeof(Grid), "Bg");
         grid.SetValue(Grid.SnapsToDevicePixelsProperty, true);
         grid.AppendChild(border);
 
@@ -1272,6 +1290,7 @@ class CustomResourceDictionary : ResourceDictionary
     private Style CreateCustomScrollBarStyle()
     {
         var style = new Style(typeof(ScrollBar));
+        style.Setters.Add(new Setter(ScrollBar.WidthProperty, 15.0));
         style.Setters.Add(new Setter(ScrollBar.MarginProperty, new Thickness{Left = 5.0}));
         style.Setters.Add(new Setter(ScrollBar.TemplateProperty, this["ScrollBarControlTemplate"]));
         return style;
@@ -1279,38 +1298,73 @@ class CustomResourceDictionary : ResourceDictionary
 }
 #endregion CustomResourceDictionary
 
+#region CustomRepeatButton
+class CustomRepeatButton : ButtonBase
+{
+
+}
+#endregion CustomRepeatButton
+
 #region CustomTrack
 class CustomTrack : Track, INotifyPropertyChanged
 {
-    public Thickness _borderMargin;
+    private Thickness _borderMargin;
     public Thickness BorderMargin
     {
         get { return _borderMargin; }
         set { _borderMargin = value; OnPropertyChanged("BorderMargin"); }
     }
 
+    private Storyboard _thumbMouseEnterAnimationStoryboard = new Storyboard();
+    private Storyboard _thumbMouseLeaveAnimationStoryboard = new Storyboard();
+    
+    private SolidColorBrush _thumbBackgroundBrush = new SolidColorBrush(Colors.Gray);
+
     public CustomTrack()
     {
         this.Thumb = new Thumb{
             Template = CreateThumbTemplate(),
         };
+        this.Resources.Add(SystemParameters.VerticalScrollBarButtonHeightKey, 100.0);
         this.IsDirectionReversed = true;
-        this.IsEnabled = true;
-        this.DataContext = this;
+
+        this.IncreaseRepeatButton = new RepeatButton{
+            Template = CreateDecreaseRepeatButtonTemplate(),
+        };
+        this.DecreaseRepeatButton = new RepeatButton{
+            Template = CreateIncreaseRepeatButtonTemplate(),
+        };
+
+        NameScope.SetNameScope(this, new NameScope());
+        this.RegisterName("ScrollThumbBackgroundColor", this._thumbBackgroundBrush);
+
+        this._thumbMouseEnterAnimationStoryboard.Children.Add(Appearance.ScrollThumbMouseEnterColorAnimation);
+        this._thumbMouseLeaveAnimationStoryboard.Children.Add(Appearance.ScrollThumbMouseLeaveColorAnimation);
+
+        this.MouseEnter += (sender, e) => {
+            this._thumbMouseEnterAnimationStoryboard.Begin(this);
+        };
+        this.MouseLeave += (sender, e) => {
+            this._thumbMouseLeaveAnimationStoryboard.Begin(this);
+        };
     }
 
     private ControlTemplate CreateThumbTemplate()
     {
         var border = new FrameworkElementFactory(typeof(Border));
 
-        border.SetValue(Border.BackgroundProperty, Appearance.GrayBrush);
+        var bindingBackground = new Binding{
+            BindsDirectlyToSource = true,
+            Source = this._thumbBackgroundBrush,
+        };
+        border.SetBinding(Border.BackgroundProperty, bindingBackground);
         var bindingBorderMargin = new Binding("BorderMargin"){
             Source = this,
         };
         border.SetBinding(Border.MarginProperty, bindingBorderMargin);
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(6.0));
         
-        var ct = new ControlTemplate(typeof(Thumb)){
+        var ct = new ControlTemplate(){
             VisualTree = border,
         };
         return ct;
@@ -1319,10 +1373,35 @@ class CustomTrack : Track, INotifyPropertyChanged
     protected override void OnRender(DrawingContext dc)
     {
         if (Orientation.Horizontal == this.Orientation) {
-            this.BorderMargin = new Thickness{Top = 4.0, Bottom = 4.0};
+            this.BorderMargin = new Thickness{Bottom = 5.0};
+            this.DecreaseRepeatButton.Command = ScrollBar.PageLeftCommand;
+            this.IncreaseRepeatButton.Command = ScrollBar.PageRightCommand;
         } else {
-            this.BorderMargin = new Thickness{Left = 4.0, Right = 4.0};
+            this.BorderMargin = new Thickness{Right = 5.0};
+            this.DecreaseRepeatButton.Command = ScrollBar.PageUpCommand;
+            this.IncreaseRepeatButton.Command = ScrollBar.PageDownCommand;
+
         }
+    }
+
+    private static ControlTemplate CreateIncreaseRepeatButtonTemplate()
+    {
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        var ct = new ControlTemplate(){
+            VisualTree = border,
+        };
+        return ct;
+    }
+
+    private static ControlTemplate CreateDecreaseRepeatButtonTemplate()
+    {
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        var ct = new ControlTemplate(){
+            VisualTree = border,
+        };
+        return ct;
     }
 
     public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
