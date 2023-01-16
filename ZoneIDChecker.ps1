@@ -33,7 +33,7 @@ if ($ShowConsole -eq $false)
 }
 
 #============================================================================ #
-#region WPF
+# C# Section
 Try {
     [void][MainWindow]
 } Catch {
@@ -59,12 +59,12 @@ using Microsoft.Win32.SafeHandles;
 using System.Configuration;
 using System.Diagnostics;
 using System.Threading;
-using System.Collections.Specialized ;
-
+using System.Collections.Specialized;
+using System.Dynamic;
 using System.Threading.Tasks;
 
-#region Paint
-public class Paint
+#region Appearance
+public class Appearance
 {
     public static Color BackgroundColor = new Color{A =255, R = 40, G = 40, B = 40};
     public static Brush BackgroundBrush = new SolidColorBrush(BackgroundColor);
@@ -119,19 +119,21 @@ public class Paint
     public static FontFamily IconFontFamily = new FontFamily("Segoe MDL2 Assets");
     public static FontFamily textFontFamily = new FontFamily("Meiryo");
 
+    public static Geometry Line = Geometry.Parse("M 0,2 L 0,15 L 1,15 L 1,2 Z");
+
     public static DoubleAnimation ToggleOnXAnimation = new DoubleAnimation{
         From = 0.0,
-        To = 20.0,
+        To = 19.0,
         Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
     };
 
     public static DoubleAnimation ToggleOffXAnimation = new DoubleAnimation{
-        From = 20.0,
+        From = 19.0,
         To = 0.0,
         Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
     };
     
-    static Paint()
+    static Appearance()
     {
         Storyboard.SetTargetName(ToggleOnXAnimation, "ToggleSwitchTransform");
         Storyboard.SetTargetProperty(ToggleOnXAnimation, new PropertyPath(TranslateTransform.XProperty));
@@ -139,6 +141,8 @@ public class Paint
         Storyboard.SetTargetName(ToggleOffXAnimation, "ToggleSwitchTransform");
         Storyboard.SetTargetProperty(ToggleOffXAnimation, new PropertyPath(TranslateTransform.XProperty));
     }
+
+
 
 }
 #endregion
@@ -161,7 +165,7 @@ public class MainWindow : Window
         this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         //this.SizeToContent = SizeToContent.WidthAndHeight;
         this.Topmost = true;
-        this.Background = Paint.BackgroundBrush;
+        this.Background = Appearance.BackgroundBrush;
         this.Loaded += (sender, e) => {this.Topmost = false;};
         this.Resources = new CustomResourceDictionary();
 
@@ -184,7 +188,7 @@ class MainGrid : Grid
         this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(60.0)});
         this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(50.0)});
         this.RowDefinitions.Add(new RowDefinition{MinHeight = 20.0});
-        this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(25.0)});
+        this.RowDefinitions.Add(new RowDefinition{Height = new GridLength(30.0)});
 
         var naviPanel = new NavigatePanel();
         SetRow(naviPanel, 0);
@@ -211,17 +215,20 @@ class MainGrid : Grid
             if (0 == filerPanel.SelectedItems.Count)
             {
                 this._opPanel.SetSelectedItemText(String.Empty, String.Empty);
+                Data.StatusContent["SelectedItemsCount"].Text = String.Empty;
             }
             else if (1 == filerPanel.SelectedItems.Count)
             {
                 string nameText = ((FileSystemInfoEntry)filerPanel.SelectedItem).Name;
                 this._opPanel.SetSelectedItemText(nameText, String.Empty);
+                Data.StatusContent["SelectedItemsCount"].Text = "1 item selected";
             }
             else
             {
                 string nameText = String.Format("{0} ...", ((FileSystemInfoEntry)filerPanel.SelectedItem).Name);
                 string countText = String.Format(" Total {0} items", (filerPanel.SelectedItems.Count));
                 this._opPanel.SetSelectedItemText(nameText, countText);
+                Data.StatusContent["SelectedItemsCount"].Text = String.Format("{0} items selected", (filerPanel.SelectedItems.Count));
             }
         } catch (Exception exc) {
             Console.WriteLine(exc.Message);
@@ -250,7 +257,7 @@ class OperationPanel : Grid
         var label = new Label{
             Content = "Selected items :",
             FontSize = 17.0,
-            Foreground = Paint.ForegroundBrush,
+            Foreground = Appearance.ForegroundBrush,
             Margin = new Thickness{Left = 10.0, Right = 10.0},
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -258,14 +265,14 @@ class OperationPanel : Grid
 
         this._selectedItemsCountTextBlock = new TextBlock{
             FontSize = 17.0,
-            Foreground = Paint.ForegroundBrush,
+            Foreground = Appearance.ForegroundBrush,
             VerticalAlignment = VerticalAlignment.Center,
         };
         DockPanel.SetDock(this._selectedItemsCountTextBlock, Dock.Right);
 
         this._selectedItemNameTextBlock = new TextBlock{
             FontSize = 17.0,
-            Foreground = Paint.ForegroundBrush,
+            Foreground = Appearance.ForegroundBrush,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
@@ -282,7 +289,7 @@ class OperationPanel : Grid
         var border = new Border{
             Margin = new Thickness{Left = 10.0, Right = 10.0},
             BorderThickness = new Thickness{Bottom = 1.0},
-            BorderBrush = Paint.ForegroundBrush,
+            BorderBrush = Appearance.ForegroundBrush,
             Child = dockPanel,
         };
         SetColumn(border, 1);
@@ -347,13 +354,13 @@ public class CustomButton : ButtonBase
         textBlock.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         textBlock.SetValue(TextBlock.FontSizeProperty, 17.0);
         textBlock.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
-        textBlock.SetValue(TextBlock.ForegroundProperty, Paint.ForegroundBrush);
+        textBlock.SetValue(TextBlock.ForegroundProperty, Appearance.ForegroundBrush);
         textBlock.SetValue(TextBlock.TextProperty, caption);
         
         var border = new FrameworkElementFactory(typeof(Border), "border");
         border.SetValue(Border.PaddingProperty, new Thickness(35.0, 0.0, 35.0, 0.0));
         border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4.0));
-        border.SetValue(Border.BackgroundProperty, Paint.OperationButtonBrush);
+        border.SetValue(Border.BackgroundProperty, Appearance.OperationButtonBrush);
 
         border.AppendChild(textBlock);
 
@@ -364,7 +371,7 @@ public class CustomButton : ButtonBase
         var mouseOverTrigger = new MultiTrigger();
         mouseOverTrigger.Conditions.Add(new Condition(CustomButton.IsMouseOverProperty, true));
         mouseOverTrigger.Conditions.Add(new Condition(CustomButton.IsMouseCapturedProperty, false));
-        mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Paint.OperationButtonMouseOverBackgroundBrush, "border"));
+        mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Appearance.OperationButtonMouseOverBackgroundBrush, "border"));
         template.Triggers.Add(mouseOverTrigger);
 
         return template;
@@ -390,8 +397,8 @@ public class CustomToggleButton : ButtonBase
         NameScope.SetNameScope(this, new NameScope());
         this.RegisterName("ToggleSwitchTransform", this._toggleSwitchTransform);
 
-        this._toggleOnAnimationStoryboard.Children.Add(Paint.ToggleOnXAnimation);
-        this._toggleOffAnimationStoryboard.Children.Add(Paint.ToggleOffXAnimation);
+        this._toggleOnAnimationStoryboard.Children.Add(Appearance.ToggleOnXAnimation);
+        this._toggleOffAnimationStoryboard.Children.Add(Appearance.ToggleOffXAnimation);
 
         this.MouseEnter += new MouseEventHandler(CustomToggleButton_MouseEnter);
         this.MouseLeave += new MouseEventHandler(CustomToggleButton_MouseLeave);
@@ -400,13 +407,12 @@ public class CustomToggleButton : ButtonBase
     private void InitializeComponent(string caption)
     {
         var toggle = new Border{
-            Height = 16.0,
-            Width = 16.0,
-            VerticalAlignment = VerticalAlignment.Center,
+            Height = 15.0,
+            Width = 15.0,
             HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness{Top = 1.0, Left = 2.0, Right = 2.0},
-            CornerRadius = new CornerRadius(8.5),
-            Background = Paint.ForegroundBrush,
+            Margin = new Thickness{Left = 3.0, Top = 1.0},
+            CornerRadius = new CornerRadius(7.5),
+            Background = Appearance.ForegroundBrush,
             RenderTransform = this._toggleSwitchTransform,
         };
         
@@ -414,7 +420,7 @@ public class CustomToggleButton : ButtonBase
             Height = 20.0,
             Width = 40.0,
             CornerRadius = new CornerRadius(10.0),
-            Background = Paint.ToggleButtonBackgroundBrush,
+            Background = Appearance.ToggleButtonBackgroundBrush,
         };
         this._border.Child = toggle;
 
@@ -423,7 +429,7 @@ public class CustomToggleButton : ButtonBase
             VerticalAlignment = VerticalAlignment.Center,
             FontSize = 16.0,
             TextAlignment = TextAlignment.Center,
-            Foreground = Paint.ForegroundBrush,
+            Foreground = Appearance.ForegroundBrush,
             Text = caption,
         };
 
@@ -440,18 +446,18 @@ public class CustomToggleButton : ButtonBase
     private void CustomToggleButton_MouseEnter(object sender, MouseEventArgs e)
     {
         if (this._toggleSwitch) {
-            this._border.Background = Paint.ToggleButtonEnabledMouseOverBackgroundBrush;
+            this._border.Background = Appearance.ToggleButtonEnabledMouseOverBackgroundBrush;
         } else {
-            this._border.Background = Paint.ToggleButtonMouseOverBackgroundBrush;
+            this._border.Background = Appearance.ToggleButtonMouseOverBackgroundBrush;
         }
     }
 
     private void CustomToggleButton_MouseLeave(object sender, MouseEventArgs e)
     {
         if (this._toggleSwitch) {
-            this._border.Background = Paint.ToggleButtonEnabledBackgroundBrush;
+            this._border.Background = Appearance.ToggleButtonEnabledBackgroundBrush;
         } else {
-            this._border.Background = Paint.ToggleButtonBackgroundBrush;
+            this._border.Background = Appearance.ToggleButtonBackgroundBrush;
         }
     }
 
@@ -464,17 +470,17 @@ public class CustomToggleButton : ButtonBase
             this._toggleSwitch = false;
             this._toggleOffAnimationStoryboard.Begin(this);
             if (this.IsMouseOver)
-                this._border.Background = Paint.ToggleButtonMouseOverBackgroundBrush;
+                this._border.Background = Appearance.ToggleButtonMouseOverBackgroundBrush;
             else
-                this._border.Background = Paint.ToggleButtonBackgroundBrush;
+                this._border.Background = Appearance.ToggleButtonBackgroundBrush;
         } else {
             //Console.WriteLine("On");
             this._toggleSwitch = true;
             this._toggleOnAnimationStoryboard.Begin(this);
             if (this.IsMouseOver)
-                this._border.Background = Paint.ToggleButtonEnabledMouseOverBackgroundBrush;
+                this._border.Background = Appearance.ToggleButtonEnabledMouseOverBackgroundBrush;
             else
-                this._border.Background = Paint.ToggleButtonEnabledBackgroundBrush;
+                this._border.Background = Appearance.ToggleButtonEnabledBackgroundBrush;
         }
         return this._toggleSwitch;
     }
@@ -561,8 +567,8 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
         var textBox = new TextBox{
             Template = CreateTextBoxTemplate(),
             Margin = new Thickness{Left = 10.0},
-            CaretBrush = Paint.ForegroundBrush,
-            Foreground = Paint.ForegroundBrush,
+            CaretBrush = Appearance.ForegroundBrush,
+            Foreground = Appearance.ForegroundBrush,
             FontSize = 16.0,
         };
         SetDock(textBox, Dock.Left);
@@ -594,7 +600,7 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
 
         var border = new Border{
             BorderThickness = new Thickness(1.0),
-            BorderBrush = Paint.TextBoxBorderBrush,
+            BorderBrush = Appearance.TextBoxBorderBrush,
             Height = 38.0,
             CornerRadius = new CornerRadius(19.0)
         };
@@ -720,17 +726,12 @@ class TileButton : ButtonBase, INotifyPropertyChanged
         set { this._backgroundBrush = value; OnPropertyChanged("BackgroundBrush"); }
     }
 
-    static TileButton()
-    {
-        DependencyProperty.Register("VisibilityConverter", typeof(bool), typeof(TileButton));
-    }
-
     public TileButton()
     {
         this.Template = CreateTileButtonTemplate();
         this.VerticalAlignment = VerticalAlignment.Center;
-        this.Foreground = Paint.ForegroundBrush;
-        this.FontFamily = Paint.IconFontFamily;
+        this.Foreground = Appearance.ForegroundBrush;
+        this.FontFamily = Appearance.IconFontFamily;
         //this.FontWeight = FontWeights.Medium;
         this.FontSize = 17.0;
         this.Cursor = Cursors.Hand;
@@ -764,14 +765,14 @@ class TileButton : ButtonBase, INotifyPropertyChanged
 
     private void TileButton_MouseEnter(object sender, MouseEventArgs e)
     {
-        this.BackgroundBrush = Paint.MouseOverBackgroundBrush;
-        this.Foreground = Paint.MouseOverForegroundBrush;
+        this.BackgroundBrush = Appearance.MouseOverBackgroundBrush;
+        this.Foreground = Appearance.MouseOverForegroundBrush;
     }
 
     private void TileButton_MouseLeave(object sender, MouseEventArgs e)
     {
         this.BackgroundBrush = Brushes.Transparent;
-        this.Foreground = Paint.ForegroundBrush;
+        this.Foreground = Appearance.ForegroundBrush;
     }
 
     public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
@@ -791,9 +792,9 @@ public class FilerPanel : DataGrid
     {
         this.Margin = new Thickness{Left = 10.0, Right = 10.0, Top = 15.0};
         this.Background = Brushes.Transparent;
-        this.Foreground = Paint.ForegroundBrush;
+        this.Foreground = Appearance.ForegroundBrush;
         this.FontSize = 15.0;
-        this.FontFamily = Paint.textFontFamily;
+        this.FontFamily = Appearance.textFontFamily;
         this.BorderThickness = new Thickness(0.0);
         this.AutoGenerateColumns = false;
         this.HeadersVisibility = DataGridHeadersVisibility.Column;
@@ -807,7 +808,7 @@ public class FilerPanel : DataGrid
         this.CellStyle = CreateCellStyle();
         this.ColumnHeaderStyle = CreateColumnHeaderStyle();
         this.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
-        this.HorizontalGridLinesBrush = Paint.GrayBorderBrush;
+        this.HorizontalGridLinesBrush = Appearance.GrayBorderBrush;
         this.Columns.Add(new DataGridTemplateColumn{
             Header = "Name",
             CellTemplate = CreateNameCellTemplate(),
@@ -896,7 +897,7 @@ public class FilerPanel : DataGrid
         check.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         //check.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
         check.SetValue(TextBlock.FontSizeProperty, 18.0);
-        check.SetValue(TextBlock.FontFamilyProperty, Paint.IconFontFamily);
+        check.SetValue(TextBlock.FontFamilyProperty, Appearance.IconFontFamily);
 
         var template = new DataTemplate{
             VisualTree = check
@@ -908,7 +909,7 @@ public class FilerPanel : DataGrid
     {
         var style = new Style();
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness{Right = 1.0}));
-        style.Setters.Add(new Setter(Control.BorderBrushProperty, Paint.GrayBrush));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Appearance.GrayBrush));
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         style.Setters.Add(new Setter(Control.FontSizeProperty, 16.0));
         style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Medium));
@@ -949,6 +950,38 @@ public class CustomStatusBar : StatusBar
 {
     public CustomStatusBar()
     {
+        this.Foreground = Appearance.ForegroundBrush;
+        this.Background = Brushes.Transparent;
+        this.ItemsSource = Data.StatusContent;
+        this.VerticalContentAlignment = VerticalAlignment.Center;
+        this.Margin = new Thickness{Left = 5.0, Right = 5.0};
+        this.FontSize = 16.0;
+        this.ItemTemplate = CreateTemplate();
+    }
+
+    private static DataTemplate CreateTemplate()
+    {
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.SetValue(TextBlock.MarginProperty, new Thickness{Left = 5.0, Right = 15.0});
+        text.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        text.SetBinding(TextBlock.TextProperty, new Binding("Value.Text"));
+
+        var path = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path));
+        path.SetValue(System.Windows.Shapes.Path.DataProperty, Appearance.Line);
+        path.SetValue(System.Windows.Shapes.Path.FillProperty, Appearance.ForegroundBrush);
+        path.SetValue(System.Windows.Shapes.Path.StrokeProperty, Appearance.ForegroundBrush);
+        path.SetValue(System.Windows.Shapes.Path.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
+        stackPanel.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        stackPanel.SetBinding(StackPanel.VisibilityProperty, new Binding("Value.Visibility"));
+        stackPanel.AppendChild(text);
+        stackPanel.AppendChild(path);
+
+        var template = new DataTemplate{
+            VisualTree = stackPanel
+        };
+        return template;
     }
 }
 #endregion CustomStatusBar
@@ -1141,7 +1174,7 @@ public static class Shell
             }
         } finally {
             if(null != fs) { fs.Close(); }
-            if(buffer != IntPtr.Zero) { Marshal.FreeCoTaskMem(buffer); }
+            if(IntPtr.Zero != buffer) { Marshal.FreeCoTaskMem(buffer); }
         }
         return result;
     }
@@ -1202,7 +1235,7 @@ class CustomResourceDictionary : ResourceDictionary
         var track = new FrameworkElementFactory(typeof(CustomTrack), "PART_Track");
 
         var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.BackgroundProperty, Paint.ScrollBarBackgroundBrush);
+        border.SetValue(Border.BackgroundProperty, Appearance.ScrollBarBackgroundBrush);
         border.AppendChild(track);
 
         var grid = new FrameworkElementFactory(typeof(Grid));
@@ -1249,7 +1282,7 @@ class CustomTrack : Track, INotifyPropertyChanged
     {
         var border = new FrameworkElementFactory(typeof(Border));
 
-        border.SetValue(Border.BackgroundProperty, Paint.GrayBrush);
+        border.SetValue(Border.BackgroundProperty, Appearance.GrayBrush);
         var bindingBorderMargin = new Binding("BorderMargin"){
             Source = this,
         };
@@ -1294,24 +1327,63 @@ public class RequestRemoveZoneIdEventArgs : EventArgs
 }
 #endregion
 
+public class StatusContentEntry : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+
+    private string _text;
+    public string Text
+    {
+        get { return this._text; }
+        set {
+            this._text = value;
+            PropertyChanged.Invoke(this, new PropertyChangedEventArgs("Text"));
+            PropertyChanged.Invoke(this, new PropertyChangedEventArgs("Visibility"));
+        }
+    }
+
+    public Visibility Visibility
+    {
+        get { return (this._text == String.Empty ? Visibility.Collapsed : Visibility.Visible); }
+    }
+
+    public StatusContentEntry(string value)
+    {
+        this.Text = value;
+    }
+}
+
 #region Data
 public static class Data
 {
-    public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection;
+    public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
     public static CollectionViewSource FileInfoCollectionView;
-    public static object _lockObject;
+    public static object _lockObject = new object();
     public static CancellationTokenSource cTokenSource = null;
+
+    public static Dictionary<string, StatusContentEntry> StatusContent { get; set; }
 
     static Data()
     {
-        _lockObject = new object();
-        FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
         FileInfoCollectionView = new CollectionViewSource{
             Source = FileInfoCollection,
             IsLiveSortingRequested = true,
         };
         FileInfoCollectionView.SortDescriptions.Add(new SortDescription(AppSettings.DefaultSortProperty, AppSettings.DefaultSortDirection));
         BindingOperations.EnableCollectionSynchronization(FileInfoCollection, _lockObject);
+
+        StatusContent = new Dictionary<string, StatusContentEntry>()
+        {
+            { "ItemsCount", new StatusContentEntry(String.Empty) },
+            { "SelectedItemsCount", new StatusContentEntry(String.Empty) },
+        };
+
+        FileInfoCollection.CollectionChanged += (sender, e) => {
+                if (2 <= FileInfoCollection.Count)
+                    Data.StatusContent["ItemsCount"].Text = String.Format("{0} items", FileInfoCollection.Count);
+                else
+                    Data.StatusContent["ItemsCount"].Text = String.Format("{0} item", FileInfoCollection.Count);
+        };
     }
 
     public static DirectoryInfo _currentDirectory = new DirectoryInfo(AppSettings.DefaultFolder);
@@ -1452,7 +1524,7 @@ public static class Data
         }
     }
 }
-#endregion
+#endregion Data
 
 #region AppSettings
 static public class AppSettings
@@ -1558,7 +1630,7 @@ static public class AppSettings
     }
 }
 #endregion AppSettings
-'@ -ReferencedAssemblies WindowsBase, System.Threading, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
+'@ -ReferencedAssemblies Microsoft.CSharp, WindowsBase, System.Threading, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
 }
 
 if ($UserDebug) {
@@ -1566,7 +1638,7 @@ if ($UserDebug) {
 }
 
 # ============================================================================ #
-# region Program
+# PowerShell Section
 function Program
 {
     $MainWindow = New-Object MainWindow
@@ -1597,16 +1669,12 @@ function Program
                 $entry.HasZoneId = [Shell]::CheckZoneId($entry.Path)
             }
         }
-
-
-
         #[Data]::OnCurrentDirectoryChanged()
     })
 
     $null = $MainWindow.ShowDialog()
     #$MainWindow.Close()
 }
-# endregion
 
 $mutexObj = New-Object Threading.Mutex($false, ('Global\{0}' -f $MyInvocation.MyCommand.Name))
 
@@ -1616,4 +1684,3 @@ if ($mutexObj.WaitOne(0, $false)) {
 }
 
 $mutexObj.Close()
-
