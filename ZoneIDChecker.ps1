@@ -121,6 +121,8 @@ public class Appearance
 
     public static Geometry Line = Geometry.Parse("M 0,2 L 0,15 L 1,15 L 1,2 Z");
 
+    public static BitmapSource DirectoryIcon;
+
     public static DoubleAnimation ToggleOnXAnimation = new DoubleAnimation{
         From = 0.0,
         To = 19.0,
@@ -135,6 +137,8 @@ public class Appearance
     
     static Appearance()
     {
+        DirectoryIcon = Shell.GetSystemIcon(3);
+
         Storyboard.SetTargetName(ToggleOnXAnimation, "ToggleSwitchTransform");
         Storyboard.SetTargetProperty(ToggleOnXAnimation, new PropertyPath(TranslateTransform.XProperty));
 
@@ -994,7 +998,7 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
     public string _path;
     public DateTime _lastWriteTime;
     public bool _isDirectory;
-    public bool _hasZoneId;
+    public bool _hasZoneId = false;
 
     public FileSystemInfoEntry(FileSystemInfo fsi)
     {
@@ -1002,12 +1006,26 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
         this._name = fsi.Name;
         this._lastWriteTime = fsi.LastWriteTime;
         this._isDirectory = (bool)((fsi.Attributes & FileAttributes.Directory) == FileAttributes.Directory);
-        this._icon = Shell.GetIconBitmapSource(this._path, fsi.Attributes);
-        this._icon.Freeze();
-        if (false == this._isDirectory) {
-            this._hasZoneId = Shell.CheckZoneId(this._path);
+        if (!this._isDirectory)
+        {
+            //this._hasZoneId = Shell.CheckZoneId(this._path);
+            Data.ZoneIDCheckQueueList.Add(this);
+            if(!Data.IconsDictionary.ContainsKey(fsi.Extension))
+            {
+                Data.IconsDictionary.Add(fsi.Extension, Shell.GetIconBitmapSource(this._path, fsi.Attributes));
+            }
+            this._icon = Data.IconsDictionary[fsi.Extension];
+        }
+        else
+        {
+            this._icon = Appearance.DirectoryIcon;
         }
     }
+
+    /*~FileSystemInfoEntry()
+    {
+        Console.WriteLine(String.Format("FileSystemInfoEntry Destructor : {0}", this.Name));
+    }*/
 
     public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
 
@@ -1179,7 +1197,7 @@ public static class Shell
         return result;
     }
 
-    private static BitmapSource GetSystemIcon(int nIconIndex)
+    public static BitmapSource GetSystemIcon(int nIconIndex)
     {
         try
         {
@@ -1187,9 +1205,11 @@ public static class Shell
             IntPtr hSIcon = IntPtr.Zero;
             ExtractIconEx("shell32.dll", nIconIndex, IntPtr.Zero, out hSIcon, 1);
             var bms = Imaging.CreateBitmapSourceFromHIcon(hSIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
+
             //DestroyIcon(hLIcon);
             DestroyIcon(hSIcon);
 
+            bms.Freeze();
             return bms;
         } catch { 
             return BitmapSource.Create(24, 24, 96, 96, PixelFormats.Default, BitmapPalettes.WebPalette, new byte[72], 3);
@@ -1213,6 +1233,7 @@ public static class Shell
         if (null != bms)
         {
             DestroyIcon(info.hIcon);
+            bms.Freeze();
             return bms;
         }
         else
@@ -1357,11 +1378,14 @@ public class StatusContentEntry : INotifyPropertyChanged
 public static class Data
 {
     public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
+    public static List<FileSystemInfoEntry> ZoneIDCheckQueueList = new List<FileSystemInfoEntry>();
     public static CollectionViewSource FileInfoCollectionView;
     public static object _lockObject = new object();
     public static CancellationTokenSource cTokenSource = null;
 
     public static Dictionary<string, StatusContentEntry> StatusContent { get; set; }
+
+    public static Dictionary<string, BitmapSource> IconsDictionary = new Dictionary<string, BitmapSource>();
 
     static Data()
     {
@@ -1379,10 +1403,10 @@ public static class Data
         };
 
         FileInfoCollection.CollectionChanged += (sender, e) => {
-                if (2 <= FileInfoCollection.Count)
-                    Data.StatusContent["ItemsCount"].Text = String.Format("{0} items", FileInfoCollection.Count);
-                else
-                    Data.StatusContent["ItemsCount"].Text = String.Format("{0} item", FileInfoCollection.Count);
+            if (2 <= FileInfoCollection.Count)
+                Data.StatusContent["ItemsCount"].Text = String.Format("{0} items", FileInfoCollection.Count);
+            else
+                Data.StatusContent["ItemsCount"].Text = String.Format("{0} item", FileInfoCollection.Count);
         };
     }
 
@@ -1461,6 +1485,11 @@ public static class Data
             cTokenSource.Cancel();
         }
 
+        if (IconsDictionary.Count > 512)
+        {
+            IconsDictionary.Clear();
+        }
+
         lock (_lockObject)
         {
             FileInfoCollection.Clear();
@@ -1477,6 +1506,9 @@ public static class Data
         }
 
         await GetCollectionAsync();
+
+        //Console.WriteLine(String.Format("ZoneIDCheckQueueList.Count : {0}", ZoneIDCheckQueueList.Count));
+        //Console.WriteLine(String.Format("IconsDictionary.Count : {0}", IconsDictionary.Count));
     }
 
     public static Task GetCollectionAsync()
@@ -1497,10 +1529,20 @@ public static class Data
                 if (token.IsCancellationRequested)
                 {
                     //token.ThrowIfCancellationRequested();
-                    break;
+                    return;
                 }
                 FileInfoCollection.Add(new FileSystemInfoEntry(info));
             }
+            foreach (FileSystemInfoEntry entry in ZoneIDCheckQueueList)
+            {
+                if (token.IsCancellationRequested)
+                {
+                    //token.ThrowIfCancellationRequested();
+                    break;
+                }
+                entry.HasZoneId = Shell.CheckZoneId(entry.Path);
+            }
+            ZoneIDCheckQueueList.Clear();
         }
     }
 
