@@ -47,6 +47,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Media.Effects;
 using System.Windows.Interop;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -62,112 +63,6 @@ using System.Threading;
 using System.Collections.Specialized;
 using System.Dynamic;
 using System.Threading.Tasks;
-
-#region Appearance
-public class Appearance
-{
-    public static Color BackgroundColor = new Color{A =255, R = 40, G = 40, B = 40};
-    public static Brush BackgroundBrush = new SolidColorBrush(BackgroundColor);
-
-    public static Brush ForegroundBrush = new SolidColorBrush(Colors.WhiteSmoke);
-
-    public static Brush BlueBrush = new SolidColorBrush(Colors.Aqua);
-    public static Brush GrayBrush = new SolidColorBrush(Colors.Gray);
-
-    public static Color GrayBorderColor = new Color{A =255, R =75, G = 75, B = 75};
-    public static Brush GrayBorderBrush = new SolidColorBrush(GrayBorderColor);
-
-    public static Color TextBoxBackgroundColor = new Color{A =255, R = 30, G = 30, B = 30};
-    public static Brush TextBoxBackgroundBrush = new SolidColorBrush(TextBoxBackgroundColor);
-
-    public static Color TextBoxBorderColor = new Color{A =255, R = 80, G = 80, B = 80};
-    public static Brush TextBoxBorderBrush = new SolidColorBrush(TextBoxBorderColor);
-
-    public static Color ScrollBarBackgroundColor = new Color{A =255, R =40, G = 40, B =40};
-    public static Brush ScrollBarBackgroundBrush = new SolidColorBrush(ScrollBarBackgroundColor);
-
-    public static Color MouseOverBackgroundColor = new Color {A = 255, R = 50, G = 50, B = 50};
-    public static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
-
-    public static Color MouseOverForegroundColor = new Color {A = 255, R = 60, G = 210, B = 255};
-    public static Brush MouseOverForegroundBrush = new SolidColorBrush(MouseOverForegroundColor);
-
-    public static Color ButtonBackgroundColor = new Color {A = 255, R = 55, G = 55, B = 55};
-    public static Brush ButtonBackgroundBrush = new SolidColorBrush(ButtonBackgroundColor);
-
-    public static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 85, G = 85, B = 85};
-    public static Brush ButtonMouseOverBackgroundBrush = new SolidColorBrush(ButtonMouseOverBackgroundColor);
-
-    public static Color OperationButtonColor = new Color {A = 255, R = 0, G = 120, B = 220};
-    public static Brush OperationButtonBrush = new SolidColorBrush(OperationButtonColor);
-
-    public static Color OperationButtonMouseOverBackgroundColor = new Color {A = 255, R = 10, G = 140, B = 240};
-    public static Brush OperationButtonMouseOverBackgroundBrush = new SolidColorBrush(OperationButtonMouseOverBackgroundColor);
-
-    public static Color ToggleButtonBackgroundColor = new Color {A = 255, R = 80, G = 80, B = 80};
-    public static Brush ToggleButtonBackgroundBrush = new SolidColorBrush(ToggleButtonBackgroundColor);
-
-    public static Color ToggleButtonMouseOverBackgroundColor = new Color {A = 255, R = 90, G = 90, B = 90};
-    public static Brush ToggleButtonMouseOverBackgroundBrush = new SolidColorBrush(ToggleButtonMouseOverBackgroundColor);
-
-    public static Color ToggleButtonEnabledBackgroundColor = new Color {A = 255, R = 0, G = 120, B = 220};
-    public static Brush ToggleButtonEnabledBackgroundBrush = new SolidColorBrush(ToggleButtonEnabledBackgroundColor);
-
-    public static Color ToggleButtonEnabledMouseOverBackgroundColor = new Color {A = 255, R = 10, G = 140, B = 240};
-    public static Brush ToggleButtonEnabledMouseOverBackgroundBrush = new SolidColorBrush(ToggleButtonEnabledMouseOverBackgroundColor);
-
-    public static FontFamily IconFontFamily = new FontFamily("Segoe MDL2 Assets");
-    public static FontFamily textFontFamily = new FontFamily("Meiryo");
-
-    public static Geometry Line = Geometry.Parse("M 0,2 L 0,15 L 1,15 L 1,2 Z");
-
-    public static BitmapSource DirectoryIcon;
-
-    public static DoubleAnimation ToggleOnXAnimation = new DoubleAnimation{
-        From = 0.0,
-        To = 19.0,
-        Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
-    };
-
-    public static DoubleAnimation ToggleOffXAnimation = new DoubleAnimation{
-        From = 19.0,
-        To = 0.0,
-        Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
-    };
-
-    public static ColorAnimation ScrollThumbMouseEnterColorAnimation = new ColorAnimation{
-        From = Colors.Gray,
-        To = new Color {A = 255, R = 200, G = 200, B = 200},
-        Duration = new Duration(TimeSpan.FromMilliseconds(100.0))
-    };
-
-    public static ColorAnimation ScrollThumbMouseLeaveColorAnimation = new ColorAnimation{
-        From = new Color {A = 255, R = 200, G = 200, B = 200},
-        To = Colors.Gray,
-        Duration = new Duration(TimeSpan.FromMilliseconds(100.0))
-    };
-
-    static Appearance()
-    {
-        DirectoryIcon = Shell.GetSystemIcon(3);
-
-        Storyboard.SetTargetName(ToggleOnXAnimation, "ToggleSwitchTransform");
-        Storyboard.SetTargetProperty(ToggleOnXAnimation, new PropertyPath(TranslateTransform.XProperty));
-
-        Storyboard.SetTargetName(ToggleOffXAnimation, "ToggleSwitchTransform");
-        Storyboard.SetTargetProperty(ToggleOffXAnimation, new PropertyPath(TranslateTransform.XProperty));
-
-        Storyboard.SetTargetName(ScrollThumbMouseEnterColorAnimation, "ScrollThumbBackgroundColor");
-        Storyboard.SetTargetProperty(ScrollThumbMouseEnterColorAnimation, new PropertyPath(SolidColorBrush.ColorProperty));
-
-        Storyboard.SetTargetName(ScrollThumbMouseLeaveColorAnimation, "ScrollThumbBackgroundColor");
-        Storyboard.SetTargetProperty(ScrollThumbMouseLeaveColorAnimation, new PropertyPath(SolidColorBrush.ColorProperty));
-    }
-
-
-
-}
-#endregion
 
 #region MainWindow
 public class MainWindow : Window
@@ -187,7 +82,7 @@ public class MainWindow : Window
         this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
         //this.SizeToContent = SizeToContent.WidthAndHeight;
         this.Topmost = true;
-        this.Background = Appearance.BackgroundBrush;
+        this.Background = Theme.BackgroundBrush;
         this.Loaded += (sender, e) => {this.Topmost = false;};
         this.Resources = new CustomResourceDictionary();
 
@@ -279,7 +174,7 @@ class OperationPanel : Grid
         var label = new Label{
             Content = "Selected items :",
             FontSize = 17.0,
-            Foreground = Appearance.ForegroundBrush,
+            Foreground = Theme.ForegroundBrush,
             Margin = new Thickness{Left = 10.0, Right = 10.0},
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -287,14 +182,14 @@ class OperationPanel : Grid
 
         this._selectedItemsCountTextBlock = new TextBlock{
             FontSize = 17.0,
-            Foreground = Appearance.ForegroundBrush,
+            Foreground = Theme.ForegroundBrush,
             VerticalAlignment = VerticalAlignment.Center,
         };
         DockPanel.SetDock(this._selectedItemsCountTextBlock, Dock.Right);
 
         this._selectedItemNameTextBlock = new TextBlock{
             FontSize = 17.0,
-            Foreground = Appearance.ForegroundBrush,
+            Foreground = Theme.ForegroundBrush,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
@@ -311,7 +206,7 @@ class OperationPanel : Grid
         var border = new Border{
             Margin = new Thickness{Left = 10.0, Right = 10.0},
             BorderThickness = new Thickness{Bottom = 1.0},
-            BorderBrush = Appearance.ForegroundBrush,
+            BorderBrush = Theme.ForegroundBrush,
             Child = dockPanel,
         };
         SetColumn(border, 1);
@@ -361,6 +256,214 @@ class OperationPanel : Grid
 }
 #endregion OperationPanel
 
+#region RootDirectoryListComboBox
+class RootDirectoryListComboBox : ComboBox
+{
+    public RootDirectoryListComboBox()
+    {
+        this.ItemsSource = Data.RootDirectoryCollection;
+        this.Template = CreateTemplate();
+        this.ItemTemplate = CreateItemTemplate();
+        this.ItemContainerStyle = CreateItemContainerStyle();
+        this.FontSize = 16.0;
+        this.SelectionChanged += (sender, e) => {
+            try {
+                var path = ((FileSystemInfoEntry)this.SelectedItem).Path;
+                if (null != path && Directory.Exists(path))
+                {
+                    Data.CurrentDirectory =  new DirectoryInfo(path);
+                }
+            } catch { }
+            this.SelectedIndex = -1;
+        };
+        AddHandler(UIElement.PreviewMouseDownEvent, new MouseButtonEventHandler(Popup_PreviewMouseDown));
+    }
+
+    private void Popup_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        var mw = Window.GetWindow(this);
+        Point relP = Mouse.GetPosition(mw);
+        var element = mw.InputHitTest(relP);
+        if (null == element) {
+            this.IsDropDownOpen = false;
+            Point absP =mw.PointToScreen(relP);
+            Win32.SendMouseDown((int)absP.X, (int)absP.Y);
+        }
+    }
+
+    private static Style CreateItemContainerStyle()
+    {
+        var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(ComboBoxItem.BackgroundProperty));
+        border.AppendChild(presenter);
+
+        var template = new ControlTemplate(typeof(ComboBoxItem)){
+            VisualTree = border,
+        };
+
+        var style = new Style(typeof(ComboBoxItem));
+        style.Setters.Add(new Setter(ComboBoxItem.TemplateProperty, template));
+
+        var mouseOverTrigger = new Trigger{
+            Property = ComboBoxItem.IsMouseOverProperty,
+            Value = true,
+        };
+        mouseOverTrigger.Setters.Add(new Setter(ComboBoxItem.BackgroundProperty, Theme.ComboBoxMouseOverBackgroundBrush));
+        style.Triggers.Add(mouseOverTrigger);
+
+        return style;
+
+    }
+
+    private static DataTemplate CreateItemTemplate()
+    {
+        var icon = new FrameworkElementFactory(typeof(Image));
+        icon.SetValue(Image.WidthProperty, 16.0);
+        icon.SetValue(Image.HeightProperty, 16.0);
+        icon.SetValue(Image.MarginProperty, new Thickness{Left = 5.0, Right = 5.0});
+        icon.SetBinding(Image.SourceProperty, new Binding("Icon"));
+        icon.SetValue(DockPanel.DockProperty, Dock.Left);
+
+        var name = new FrameworkElementFactory(typeof(TextBlock));
+        name.SetValue(TextBlock.MarginProperty, new Thickness{Left = 5.0, Right = 5.0});
+        name.SetValue(TextBlock.MinWidthProperty, 150.0);
+        name.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+        name.SetValue(TextBlock.ForegroundProperty, Theme.ForegroundBrush);
+        name.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        name.SetBinding(TextBlock.TextProperty, new Binding("Name"));
+        name.SetValue(DockPanel.DockProperty, Dock.Right);
+        
+        var dockPanel = new FrameworkElementFactory(typeof(DockPanel));
+        dockPanel.AppendChild(icon);
+        dockPanel.AppendChild(name);
+
+        var template = new DataTemplate{
+            VisualTree = dockPanel
+        };
+
+        return template;
+    }
+
+    private ControlTemplate CreateTemplate()
+    {
+
+        var directoryButton = new FrameworkElementFactory(typeof(DirectoryButton));
+        var isOpenBinding = new Binding("IsDropDownOpen"){
+            RelativeSource = RelativeSource.TemplatedParent,
+            Mode = BindingMode.TwoWay,
+        };
+        directoryButton.SetBinding(DirectoryButton.IsCheckedProperty, isOpenBinding);
+
+        var stackPanel = new FrameworkElementFactory(typeof(StackPanel), "ItemsPresenter");
+        stackPanel.SetValue(StackPanel.IsItemsHostProperty, true);
+
+        var scrollViewer = new FrameworkElementFactory(typeof(ScrollViewer));
+        scrollViewer.AppendChild(stackPanel);
+
+        var border = new FrameworkElementFactory(typeof(Border), "DropDownBorder");
+        border.SetValue(Border.BackgroundProperty, Theme.ComboBoxBackgroundBrush);
+        border.SetValue(Border.MarginProperty, new Thickness(15.0));
+        var dropShadowEffect = new DropShadowEffect
+        {
+            Color = Colors.Black,
+            BlurRadius = 15.0,
+            ShadowDepth = 0,
+            Opacity = 0.65
+        };
+        border.SetValue(Popup.EffectProperty, dropShadowEffect);
+        border.AppendChild(scrollViewer);
+        
+        var itemsGrid = new FrameworkElementFactory(typeof(Grid), "DropDown");
+        itemsGrid.AppendChild(border);
+
+        var popup = new FrameworkElementFactory(typeof(Popup), "PART_Popup");
+        popup.SetValue(Popup.PlacementProperty, PlacementMode.Left);
+        popup.SetValue(Popup.AllowsTransparencyProperty, true);
+        var isPopupOpenBinding = new Binding("IsDropDownOpen"){
+            RelativeSource = RelativeSource.TemplatedParent,
+        };
+        popup.SetBinding(Popup.IsOpenProperty, isPopupOpenBinding);
+        popup.AppendChild(itemsGrid);
+
+        var grid = new FrameworkElementFactory(typeof(Grid));
+        grid.AppendChild(directoryButton);
+        grid.AppendChild(popup);
+
+        var ct = new ControlTemplate(typeof(RootDirectoryListComboBox)){
+            VisualTree = grid,
+        };
+        return ct;
+    }
+
+}
+#endregion
+
+#region DirectoryButton
+class DirectoryButton : ToggleButton, INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+
+    private BitmapSource _rootDirectoryIcon;
+    public BitmapSource RootDirectoryIcon
+    {
+        get { return this._rootDirectoryIcon; }
+        set { this._rootDirectoryIcon = value; PropertyChanged.Invoke(this, new PropertyChangedEventArgs("RootDirectoryIcon"));}
+    }
+
+    public DirectoryButton()
+    {
+        this.Cursor = Cursors.Hand;
+        this.RootDirectoryIcon = Theme.SystemDriveIcon;
+        this.Template = CreateTemplate();
+        Data.CurrentDirectoryChanged += (sender, e) => {
+            foreach (FileSystemInfoEntry entry in Data.RootDirectoryCollection)
+            {
+                if(entry.Path == Data.CurrentDirectory.Root.FullName)
+                {
+                    this.RootDirectoryIcon = entry.Icon;
+                    break;
+                }
+            }
+        };
+        PropertyChanged.Invoke(this, new PropertyChangedEventArgs("RootDirectoryIcon"));
+    }
+
+    private ControlTemplate CreateTemplate()
+    {
+        var image = new FrameworkElementFactory(typeof(Image));
+        image.SetValue(Image.WidthProperty, 20.0);
+        image.SetValue(Image.HeightProperty, 20.0);
+        image.SetValue(Image.MarginProperty, new Thickness{Top = 2.0});
+        image.SetValue(Image.VerticalAlignmentProperty, VerticalAlignment.Center);
+        image.SetValue(Image.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+
+        var imageBinding = new Binding("RootDirectoryIcon"){
+            Source = this
+        };
+        image.SetBinding(Image.SourceProperty, imageBinding);
+
+        var border = new FrameworkElementFactory(typeof(Border), "border");
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(15.0));
+        border.SetValue(Border.BackgroundProperty, Theme.DirectoryButtonBackgroundBrush);
+        border.AppendChild(image);
+
+        var ct = new ControlTemplate(typeof(DirectoryButton)){
+            VisualTree = border,
+        };
+
+        var mouseOverTrigger = new MultiTrigger();
+        mouseOverTrigger.Conditions.Add(new Condition(DirectoryButton.IsMouseOverProperty, true));
+        mouseOverTrigger.Conditions.Add(new Condition(DirectoryButton.IsMouseCapturedProperty, false));
+        mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Theme.DirectoryButtonMouseOverBackgroundBrush, "border"));
+        ct.Triggers.Add(mouseOverTrigger);
+
+        return ct;
+    }
+}
+#endregion
+
 #region CustomButton
 public class CustomButton : ButtonBase
 {
@@ -376,13 +479,13 @@ public class CustomButton : ButtonBase
         textBlock.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         textBlock.SetValue(TextBlock.FontSizeProperty, 17.0);
         textBlock.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
-        textBlock.SetValue(TextBlock.ForegroundProperty, Appearance.ForegroundBrush);
+        textBlock.SetValue(TextBlock.ForegroundProperty, Theme.ForegroundBrush);
         textBlock.SetValue(TextBlock.TextProperty, caption);
         
         var border = new FrameworkElementFactory(typeof(Border), "border");
         border.SetValue(Border.PaddingProperty, new Thickness(35.0, 0.0, 35.0, 0.0));
         border.SetValue(Border.CornerRadiusProperty, new CornerRadius(4.0));
-        border.SetValue(Border.BackgroundProperty, Appearance.OperationButtonBrush);
+        border.SetValue(Border.BackgroundProperty, Theme.OperationButtonBrush);
 
         border.AppendChild(textBlock);
 
@@ -393,7 +496,7 @@ public class CustomButton : ButtonBase
         var mouseOverTrigger = new MultiTrigger();
         mouseOverTrigger.Conditions.Add(new Condition(CustomButton.IsMouseOverProperty, true));
         mouseOverTrigger.Conditions.Add(new Condition(CustomButton.IsMouseCapturedProperty, false));
-        mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Appearance.OperationButtonMouseOverBackgroundBrush, "border"));
+        mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Theme.OperationButtonMouseOverBackgroundBrush, "border"));
         template.Triggers.Add(mouseOverTrigger);
 
         return template;
@@ -419,8 +522,8 @@ public class CustomToggleButton : ButtonBase
         NameScope.SetNameScope(this, new NameScope());
         this.RegisterName("ToggleSwitchTransform", this._toggleSwitchTransform);
 
-        this._toggleOnAnimationStoryboard.Children.Add(Appearance.ToggleOnXAnimation);
-        this._toggleOffAnimationStoryboard.Children.Add(Appearance.ToggleOffXAnimation);
+        this._toggleOnAnimationStoryboard.Children.Add(Theme.ToggleOnXAnimation);
+        this._toggleOffAnimationStoryboard.Children.Add(Theme.ToggleOffXAnimation);
 
         this.MouseEnter += new MouseEventHandler(CustomToggleButton_MouseEnter);
         this.MouseLeave += new MouseEventHandler(CustomToggleButton_MouseLeave);
@@ -434,7 +537,7 @@ public class CustomToggleButton : ButtonBase
             HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness{Left = 3.0, Top = 1.0},
             CornerRadius = new CornerRadius(7.5),
-            Background = Appearance.ForegroundBrush,
+            Background = Theme.ForegroundBrush,
             RenderTransform = this._toggleSwitchTransform,
         };
         
@@ -442,7 +545,7 @@ public class CustomToggleButton : ButtonBase
             Height = 20.0,
             Width = 40.0,
             CornerRadius = new CornerRadius(10.0),
-            Background = Appearance.ToggleButtonBackgroundBrush,
+            Background = Theme.ToggleButtonBackgroundBrush,
         };
         this._border.Child = toggle;
 
@@ -451,7 +554,7 @@ public class CustomToggleButton : ButtonBase
             VerticalAlignment = VerticalAlignment.Center,
             FontSize = 16.0,
             TextAlignment = TextAlignment.Center,
-            Foreground = Appearance.ForegroundBrush,
+            Foreground = Theme.ForegroundBrush,
             Text = caption,
         };
 
@@ -468,18 +571,18 @@ public class CustomToggleButton : ButtonBase
     private void CustomToggleButton_MouseEnter(object sender, MouseEventArgs e)
     {
         if (this._toggleSwitch) {
-            this._border.Background = Appearance.ToggleButtonEnabledMouseOverBackgroundBrush;
+            this._border.Background = Theme.ToggleButtonEnabledMouseOverBackgroundBrush;
         } else {
-            this._border.Background = Appearance.ToggleButtonMouseOverBackgroundBrush;
+            this._border.Background = Theme.ToggleButtonMouseOverBackgroundBrush;
         }
     }
 
     private void CustomToggleButton_MouseLeave(object sender, MouseEventArgs e)
     {
         if (this._toggleSwitch) {
-            this._border.Background = Appearance.ToggleButtonEnabledBackgroundBrush;
+            this._border.Background = Theme.ToggleButtonEnabledBackgroundBrush;
         } else {
-            this._border.Background = Appearance.ToggleButtonBackgroundBrush;
+            this._border.Background = Theme.ToggleButtonBackgroundBrush;
         }
     }
 
@@ -492,17 +595,17 @@ public class CustomToggleButton : ButtonBase
             this._toggleSwitch = false;
             this._toggleOffAnimationStoryboard.Begin(this);
             if (this.IsMouseOver)
-                this._border.Background = Appearance.ToggleButtonMouseOverBackgroundBrush;
+                this._border.Background = Theme.ToggleButtonMouseOverBackgroundBrush;
             else
-                this._border.Background = Appearance.ToggleButtonBackgroundBrush;
+                this._border.Background = Theme.ToggleButtonBackgroundBrush;
         } else {
             //Console.WriteLine("On");
             this._toggleSwitch = true;
             this._toggleOnAnimationStoryboard.Begin(this);
             if (this.IsMouseOver)
-                this._border.Background = Appearance.ToggleButtonEnabledMouseOverBackgroundBrush;
+                this._border.Background = Theme.ToggleButtonEnabledMouseOverBackgroundBrush;
             else
-                this._border.Background = Appearance.ToggleButtonEnabledBackgroundBrush;
+                this._border.Background = Theme.ToggleButtonEnabledBackgroundBrush;
         }
         return this._toggleSwitch;
     }
@@ -562,6 +665,7 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
     public NavigatePanel()
     {
         InitializeComponent();
+
         this.Margin = new Thickness{Left = 5.0, Right = 15.0};
 
         Data.CurrentDirectoryChanged += new PropertyChangedEventHandler(Data_CurrentDirectoryChanged);
@@ -588,9 +692,9 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
     {
         var textBox = new TextBox{
             Template = CreateTextBoxTemplate(),
-            Margin = new Thickness{Left = 10.0},
-            CaretBrush = Appearance.ForegroundBrush,
-            Foreground = Appearance.ForegroundBrush,
+            Margin = new Thickness{Left = 5.0},
+            CaretBrush = Theme.ForegroundBrush,
+            Foreground = Theme.ForegroundBrush,
             FontSize = 16.0,
         };
         SetDock(textBox, Dock.Left);
@@ -605,6 +709,14 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
         textBox.GotKeyboardFocus += new KeyboardFocusChangedEventHandler(NavigatePanel_GotKeyboardFocus);
         textBox.LostKeyboardFocus += new KeyboardFocusChangedEventHandler(NavigatePanel_LostKeyboardFocus);
 
+        var rootComboBox = new RootDirectoryListComboBox{
+            Width = 30.0,
+            Height = 30.0,
+            Margin = new Thickness{Left = 2.0},
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        SetDock(rootComboBox, Dock.Left);
+
         var reloadButton = new TileButton{
             Content = "\uE149",
             Margin = new Thickness{Left = 0.0, Right = 2.0},
@@ -617,12 +729,13 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
         reloadButton.Click += new RoutedEventHandler(ReloadButton_Click);
 
         var inlinePanel = new DockPanel();
+        inlinePanel.Children.Add(rootComboBox);
         inlinePanel.Children.Add(reloadButton);
         inlinePanel.Children.Add(textBox);
 
         var border = new Border{
             BorderThickness = new Thickness(1.0),
-            BorderBrush = Appearance.TextBoxBorderBrush,
+            BorderBrush = Theme.TextBoxBorderBrush,
             Height = 38.0,
             CornerRadius = new CornerRadius(19.0)
         };
@@ -685,6 +798,13 @@ class NavigatePanel : DockPanel, INotifyPropertyChanged
             VisualTree = dockPanel,
         };
         return ct;
+    }
+
+    private void RootButton_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            Data.PrevDirectory();
+        } catch { }
     }
 
     private void LeftArrowButton_Click(object sender, RoutedEventArgs e)
@@ -752,8 +872,8 @@ class TileButton : ButtonBase, INotifyPropertyChanged
     {
         this.Template = CreateTileButtonTemplate();
         this.VerticalAlignment = VerticalAlignment.Center;
-        this.Foreground = Appearance.ForegroundBrush;
-        this.FontFamily = Appearance.IconFontFamily;
+        this.Foreground = Theme.ForegroundBrush;
+        this.FontFamily = Theme.IconFontFamily;
         //this.FontWeight = FontWeights.Medium;
         this.FontSize = 17.0;
         this.Cursor = Cursors.Hand;
@@ -787,14 +907,14 @@ class TileButton : ButtonBase, INotifyPropertyChanged
 
     private void TileButton_MouseEnter(object sender, MouseEventArgs e)
     {
-        this.BackgroundBrush = Appearance.MouseOverBackgroundBrush;
-        this.Foreground = Appearance.MouseOverForegroundBrush;
+        this.BackgroundBrush = Theme.MouseOverBackgroundBrush;
+        this.Foreground = Theme.MouseOverForegroundBrush;
     }
 
     private void TileButton_MouseLeave(object sender, MouseEventArgs e)
     {
         this.BackgroundBrush = Brushes.Transparent;
-        this.Foreground = Appearance.ForegroundBrush;
+        this.Foreground = Theme.ForegroundBrush;
     }
 
     public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
@@ -814,13 +934,14 @@ public class FilerPanel : DataGrid
     {
         this.Margin = new Thickness{Left = 5.0, Top = 15.0};
         this.Background = Brushes.Transparent;
-        this.Foreground = Appearance.ForegroundBrush;
+        this.Foreground = Theme.ForegroundBrush;
         this.FontSize = 15.0;
-        this.FontFamily = Appearance.textFontFamily;
+        this.FontFamily = Theme.textFontFamily;
         this.BorderThickness = new Thickness(0.0);
         this.AutoGenerateColumns = false;
         this.HeadersVisibility = DataGridHeadersVisibility.Column;
-        this.HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden;
+        this.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+        this.VerticalScrollBarVisibility = ScrollBarVisibility.Visible;
         VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
         Binding binding = new Binding() {
             Source = Data.FileInfoCollectionView
@@ -830,7 +951,7 @@ public class FilerPanel : DataGrid
         this.CellStyle = CreateCellStyle();
         this.ColumnHeaderStyle = CreateColumnHeaderStyle();
         this.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
-        this.HorizontalGridLinesBrush = Appearance.GrayBorderBrush;
+        this.HorizontalGridLinesBrush = Theme.GrayBorderBrush;
         this.Columns.Add(new DataGridTemplateColumn{
             Header = "Name",
             CellTemplate = CreateNameCellTemplate(),
@@ -919,7 +1040,7 @@ public class FilerPanel : DataGrid
         check.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
         //check.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
         check.SetValue(TextBlock.FontSizeProperty, 18.0);
-        check.SetValue(TextBlock.FontFamilyProperty, Appearance.IconFontFamily);
+        check.SetValue(TextBlock.FontFamilyProperty, Theme.IconFontFamily);
 
         var template = new DataTemplate{
             VisualTree = check
@@ -931,7 +1052,7 @@ public class FilerPanel : DataGrid
     {
         var style = new Style();
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness{Right = 1.0}));
-        style.Setters.Add(new Setter(Control.BorderBrushProperty, Appearance.GrayBrush));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Theme.GrayBrush));
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
         style.Setters.Add(new Setter(Control.FontSizeProperty, 16.0));
         style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Medium));
@@ -972,7 +1093,7 @@ public class CustomStatusBar : StatusBar
 {
     public CustomStatusBar()
     {
-        this.Foreground = Appearance.ForegroundBrush;
+        this.Foreground = Theme.ForegroundBrush;
         this.Background = Brushes.Transparent;
         this.ItemsSource = Data.StatusContent;
         this.VerticalContentAlignment = VerticalAlignment.Center;
@@ -989,9 +1110,9 @@ public class CustomStatusBar : StatusBar
         text.SetBinding(TextBlock.TextProperty, new Binding("Value.Text"));
 
         var path = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path));
-        path.SetValue(System.Windows.Shapes.Path.DataProperty, Appearance.Line);
-        path.SetValue(System.Windows.Shapes.Path.FillProperty, Appearance.ForegroundBrush);
-        path.SetValue(System.Windows.Shapes.Path.StrokeProperty, Appearance.ForegroundBrush);
+        path.SetValue(System.Windows.Shapes.Path.DataProperty, Theme.Line);
+        path.SetValue(System.Windows.Shapes.Path.FillProperty, Theme.ForegroundBrush);
+        path.SetValue(System.Windows.Shapes.Path.StrokeProperty, Theme.ForegroundBrush);
         path.SetValue(System.Windows.Shapes.Path.VerticalAlignmentProperty, VerticalAlignment.Center);
 
         var stackPanel = new FrameworkElementFactory(typeof(StackPanel));
@@ -1026,17 +1147,24 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
         this._isDirectory = (bool)((fsi.Attributes & FileAttributes.Directory) == FileAttributes.Directory);
         if (!this._isDirectory)
         {
-            //this._hasZoneId = Shell.CheckZoneId(this._path);
+            //this._hasZoneId = Win32.CheckZoneId(this._path);
             Data.ZoneIDCheckQueueList.Add(this);
             if(!Data.IconsDictionary.ContainsKey(fsi.Extension))
             {
-                Data.IconsDictionary.Add(fsi.Extension, Shell.GetIconBitmapSource(this._path, fsi.Attributes));
+                Data.IconsDictionary.Add(fsi.Extension, Win32.GetIconBitmapSource(this._path, fsi.Attributes));
             }
             this._icon = Data.IconsDictionary[fsi.Extension];
         }
         else
         {
-            this._icon = Appearance.DirectoryIcon;
+            if (fsi.FullName ==  System.IO.Path.GetPathRoot(fsi.FullName))
+            {
+                this._icon = Win32.GetIconBitmapSource(this._path, fsi.Attributes);
+            }
+            else
+            {
+                this._icon = Theme.DirectoryIcon;
+            }
         }
     }
 
@@ -1105,11 +1233,13 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
 }
 #endregion FileSystemInfoEntry
 
-#region Shell
-public static class Shell
+#region Win32
+public static class Win32
 {
     private static readonly IntPtr STATUS_BUFFER_OVERFLOW = (IntPtr)0x80000005;
     private static readonly int SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
+    public const string Shell32 = "shell32.dll";
+    public const string ImageRes = "ImageRes.dll";
 
     [DllImport("ntdll.dll", CharSet=CharSet.Auto)]
     private static extern IntPtr NtQueryInformationFile(SafeFileHandle fileHandle, out IO_STATUS_BLOCK IoStatusBlock, IntPtr pInfoBlock, int length, FILE_INFORMATION_CLASS fileInformation);  
@@ -1161,6 +1291,35 @@ public static class Shell
     enum FILE_INFORMATION_CLASS {
         FileDirectoryInformation = 1,
         FileStreamInformation = 22,
+    }
+
+    [DllImport("user32.dll")]
+    private extern static uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct INPUT
+    {
+        internal int type;
+        internal MOUSEINPUT mi;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct MOUSEINPUT
+    {
+        internal int dx;
+        internal int dy;
+        internal int mouseData;
+        internal int dwFlags;
+        internal int time;
+        internal IntPtr dwExtraInfo;
+    }
+
+    public static void SendMouseDown(int dx, int dy){
+        INPUT[] input = new INPUT[1];
+        input[0].mi.dx = dx;
+        input[0].mi.dy = dy;
+        input[0].mi.dwFlags = 0x0002;
+        SendInput(1, input, Marshal.SizeOf(input[0]));
     }
 
     public static bool CheckZoneId(string path) {
@@ -1215,13 +1374,13 @@ public static class Shell
         return result;
     }
 
-    public static BitmapSource GetSystemIcon(int nIconIndex)
+    public static BitmapSource GetSystemIcon(int nIconIndex, string res)
     {
         try
         {
             //IntPtr hLIcon = IntPtr.Zero;
             IntPtr hSIcon = IntPtr.Zero;
-            ExtractIconEx("shell32.dll", nIconIndex, IntPtr.Zero, out hSIcon, 1);
+            ExtractIconEx(res, nIconIndex, IntPtr.Zero, out hSIcon, 1);
             var bms = Imaging.CreateBitmapSourceFromHIcon(hSIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
 
             //DestroyIcon(hLIcon);
@@ -1240,11 +1399,11 @@ public static class Shell
         try {
             SHGetFileInfo(strPath, attr, out info, SIZE_SHFILEINFO, (SHGFI.Icon | SHGFI.SmallIcon | SHGFI.UseFileAttributes));
         } catch {
-            return GetSystemIcon(0);
+            return GetSystemIcon(0, Shell32);
         }
 
         if (IntPtr.Zero == info.hIcon || null == info.hIcon)
-            return GetSystemIcon(0);
+            return GetSystemIcon(0, Shell32);
 
         BitmapSource bms = Imaging.CreateBitmapSourceFromHIcon(info.hIcon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
 
@@ -1255,10 +1414,10 @@ public static class Shell
             return bms;
         }
         else
-            return GetSystemIcon(0);
+            return GetSystemIcon(0, Shell32);
     }
 }
-#endregion Shell
+#endregion Win32
 
 #region CustomResourceDictionary
 class CustomResourceDictionary : ResourceDictionary
@@ -1274,7 +1433,7 @@ class CustomResourceDictionary : ResourceDictionary
         var track = new FrameworkElementFactory(typeof(CustomTrack), "PART_Track");
 
         var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.BackgroundProperty, Appearance.ScrollBarBackgroundBrush);
+        border.SetValue(Border.BackgroundProperty, Theme.ScrollBarBackgroundBrush);
         border.AppendChild(track);
 
         var grid = new FrameworkElementFactory(typeof(Grid), "Bg");
@@ -1293,17 +1452,16 @@ class CustomResourceDictionary : ResourceDictionary
         style.Setters.Add(new Setter(ScrollBar.WidthProperty, 15.0));
         style.Setters.Add(new Setter(ScrollBar.MarginProperty, new Thickness{Left = 5.0}));
         style.Setters.Add(new Setter(ScrollBar.TemplateProperty, this["ScrollBarControlTemplate"]));
+        var visibilityTrigger = new Trigger{
+            Property = ScrollBar.IsEnabledProperty,
+            Value = false,
+        };
+        visibilityTrigger.Setters.Add(new Setter(ScrollBar.VisibilityProperty, Visibility.Hidden));
+        style.Triggers.Add(visibilityTrigger);
         return style;
     }
 }
 #endregion CustomResourceDictionary
-
-#region CustomRepeatButton
-class CustomRepeatButton : ButtonBase
-{
-
-}
-#endregion CustomRepeatButton
 
 #region CustomTrack
 class CustomTrack : Track, INotifyPropertyChanged
@@ -1317,7 +1475,7 @@ class CustomTrack : Track, INotifyPropertyChanged
 
     private Storyboard _thumbMouseEnterAnimationStoryboard = new Storyboard();
     private Storyboard _thumbMouseLeaveAnimationStoryboard = new Storyboard();
-    
+
     private SolidColorBrush _thumbBackgroundBrush = new SolidColorBrush(Colors.Gray);
 
     public CustomTrack()
@@ -1338,8 +1496,8 @@ class CustomTrack : Track, INotifyPropertyChanged
         NameScope.SetNameScope(this, new NameScope());
         this.RegisterName("ScrollThumbBackgroundColor", this._thumbBackgroundBrush);
 
-        this._thumbMouseEnterAnimationStoryboard.Children.Add(Appearance.ScrollThumbMouseEnterColorAnimation);
-        this._thumbMouseLeaveAnimationStoryboard.Children.Add(Appearance.ScrollThumbMouseLeaveColorAnimation);
+        this._thumbMouseEnterAnimationStoryboard.Children.Add(Theme.ScrollThumbMouseEnterColorAnimation);
+        this._thumbMouseLeaveAnimationStoryboard.Children.Add(Theme.ScrollThumbMouseLeaveColorAnimation);
 
         this.MouseEnter += (sender, e) => {
             this._thumbMouseEnterAnimationStoryboard.Begin(this);
@@ -1466,6 +1624,8 @@ public static class Data
 
     public static Dictionary<string, BitmapSource> IconsDictionary = new Dictionary<string, BitmapSource>();
 
+    public static ObservableCollection<FileSystemInfoEntry> RootDirectoryCollection = new ObservableCollection<FileSystemInfoEntry>();
+
     static Data()
     {
         FileInfoCollectionView = new CollectionViewSource{
@@ -1487,6 +1647,19 @@ public static class Data
             else
                 Data.StatusContent["ItemsCount"].Text = String.Format("{0} item", FileInfoCollection.Count);
         };
+        CreateRootDirectoryItems();
+    }
+
+    private static void CreateRootDirectoryItems()
+    {
+        DriveInfo[] allDrives = DriveInfo.GetDrives();
+
+        foreach (DriveInfo d in allDrives)
+        {
+            try {
+                Data.RootDirectoryCollection.Add(new FileSystemInfoEntry(d.RootDirectory));
+            } catch { }
+        }
     }
 
     public static DirectoryInfo _currentDirectory = new DirectoryInfo(AppSettings.DefaultFolder);
@@ -1502,6 +1675,10 @@ public static class Data
         }
         set
         {
+            if (null == value || false == value.Exists) {
+                return;
+            }
+
             if (null != _currentDirectory)
             {
                 if (0 == _prevDirectories.Count || _prevDirectories[_prevDirectories.Count - 1] != _currentDirectory.FullName)
@@ -1619,7 +1796,7 @@ public static class Data
                     //token.ThrowIfCancellationRequested();
                     break;
                 }
-                entry.HasZoneId = Shell.CheckZoneId(entry.Path);
+                entry.HasZoneId = Win32.CheckZoneId(entry.Path);
             }
             ZoneIDCheckQueueList.Clear();
         }
@@ -1646,6 +1823,123 @@ public static class Data
     }
 }
 #endregion Data
+
+#region Theme
+public class Theme
+{
+    public static Color BackgroundColor = new Color{A =255, R = 40, G = 40, B = 40};
+    public static Brush BackgroundBrush = new SolidColorBrush(BackgroundColor);
+
+    public static Brush ForegroundBrush = new SolidColorBrush(Colors.WhiteSmoke);
+
+    public static Brush BlueBrush = new SolidColorBrush(Colors.Aqua);
+    public static Brush GrayBrush = new SolidColorBrush(Colors.Gray);
+
+    public static Color GrayBorderColor = new Color{A =255, R =75, G = 75, B = 75};
+    public static Brush GrayBorderBrush = new SolidColorBrush(GrayBorderColor);
+
+    public static Color TextBoxBackgroundColor = new Color{A =255, R = 30, G = 30, B = 30};
+    public static Brush TextBoxBackgroundBrush = new SolidColorBrush(TextBoxBackgroundColor);
+
+    public static Color TextBoxBorderColor = new Color{A =255, R = 80, G = 80, B = 80};
+    public static Brush TextBoxBorderBrush = new SolidColorBrush(TextBoxBorderColor);
+
+    public static Color ScrollBarBackgroundColor = new Color{A =255, R =40, G = 40, B =40};
+    public static Brush ScrollBarBackgroundBrush = new SolidColorBrush(ScrollBarBackgroundColor);
+
+    public static Color MouseOverBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
+    public static Brush MouseOverBackgroundBrush = new SolidColorBrush(MouseOverBackgroundColor);
+
+    public static Color MouseOverForegroundColor = new Color {A = 255, R = 60, G = 210, B = 255};
+    public static Brush MouseOverForegroundBrush = new SolidColorBrush(MouseOverForegroundColor);
+
+    public static Color ButtonBackgroundColor = new Color {A = 255, R = 55, G = 55, B = 55};
+    public static Brush ButtonBackgroundBrush = new SolidColorBrush(ButtonBackgroundColor);
+
+    public static Color ButtonMouseOverBackgroundColor = new Color {A = 255, R = 85, G = 85, B = 85};
+    public static Brush ButtonMouseOverBackgroundBrush = new SolidColorBrush(ButtonMouseOverBackgroundColor);
+
+    public static Color OperationButtonColor = new Color {A = 255, R = 0, G = 120, B = 220};
+    public static Brush OperationButtonBrush = new SolidColorBrush(OperationButtonColor);
+
+    public static Color OperationButtonMouseOverBackgroundColor = new Color {A = 255, R = 10, G = 140, B = 240};
+    public static Brush OperationButtonMouseOverBackgroundBrush = new SolidColorBrush(OperationButtonMouseOverBackgroundColor);
+
+    public static Color ToggleButtonBackgroundColor = new Color {A = 255, R = 80, G = 80, B = 80};
+    public static Brush ToggleButtonBackgroundBrush = new SolidColorBrush(ToggleButtonBackgroundColor);
+
+    public static Color ToggleButtonMouseOverBackgroundColor = new Color {A = 255, R = 90, G = 90, B = 90};
+    public static Brush ToggleButtonMouseOverBackgroundBrush = new SolidColorBrush(ToggleButtonMouseOverBackgroundColor);
+
+    public static Color ToggleButtonEnabledBackgroundColor = new Color {A = 255, R = 0, G = 120, B = 220};
+    public static Brush ToggleButtonEnabledBackgroundBrush = new SolidColorBrush(ToggleButtonEnabledBackgroundColor);
+
+    public static Color ToggleButtonEnabledMouseOverBackgroundColor = new Color {A = 255, R = 10, G = 140, B = 240};
+    public static Brush ToggleButtonEnabledMouseOverBackgroundBrush = new SolidColorBrush(ToggleButtonEnabledMouseOverBackgroundColor);
+
+    public static Color DirectoryButtonBackgroundColor = new Color {A = 255, R = 40, G = 40, B = 40};
+    public static Brush DirectoryButtonBackgroundBrush = new SolidColorBrush(DirectoryButtonBackgroundColor);
+
+    public static Color DirectoryButtonMouseOverBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
+    public static Brush DirectoryButtonMouseOverBackgroundBrush = new SolidColorBrush(DirectoryButtonMouseOverBackgroundColor);
+
+    public static Color ComboBoxBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
+    public static Brush ComboBoxBackgroundBrush = new SolidColorBrush(ComboBoxBackgroundColor);
+
+    public static Color ComboBoxMouseOverBackgroundColor = new Color {A = 255, R = 90, G = 90, B = 90};
+    public static Brush ComboBoxMouseOverBackgroundBrush = new SolidColorBrush(ComboBoxMouseOverBackgroundColor);
+    
+    public static FontFamily IconFontFamily = new FontFamily("Segoe MDL2 Assets");
+    public static FontFamily textFontFamily = new FontFamily("Meiryo");
+
+    public static Geometry Line = Geometry.Parse("M 0,2 L 0,15 L 1,15 L 1,2 Z");
+
+    public static BitmapSource DirectoryIcon;
+    public static BitmapSource SystemDriveIcon;
+
+    public static DoubleAnimation ToggleOnXAnimation = new DoubleAnimation{
+        From = 0.0,
+        To = 19.0,
+        Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
+    };
+
+    public static DoubleAnimation ToggleOffXAnimation = new DoubleAnimation{
+        From = 19.0,
+        To = 0.0,
+        Duration = new Duration(TimeSpan.FromMilliseconds(200.0))
+    };
+
+    public static ColorAnimation ScrollThumbMouseEnterColorAnimation = new ColorAnimation{
+        From = Colors.Gray,
+        To = new Color {A = 255, R = 200, G = 200, B = 200},
+        Duration = new Duration(TimeSpan.FromMilliseconds(100.0))
+    };
+
+    public static ColorAnimation ScrollThumbMouseLeaveColorAnimation = new ColorAnimation{
+        From = new Color {A = 255, R = 200, G = 200, B = 200},
+        To = Colors.Gray,
+        Duration = new Duration(TimeSpan.FromMilliseconds(100.0))
+    };
+
+    static Theme()
+    {
+        DirectoryIcon = Win32.GetSystemIcon(3, Win32.Shell32);
+        SystemDriveIcon = Win32.GetSystemIcon(31, Win32.ImageRes);
+
+        Storyboard.SetTargetName(ToggleOnXAnimation, "ToggleSwitchTransform");
+        Storyboard.SetTargetProperty(ToggleOnXAnimation, new PropertyPath(TranslateTransform.XProperty));
+
+        Storyboard.SetTargetName(ToggleOffXAnimation, "ToggleSwitchTransform");
+        Storyboard.SetTargetProperty(ToggleOffXAnimation, new PropertyPath(TranslateTransform.XProperty));
+
+        Storyboard.SetTargetName(ScrollThumbMouseEnterColorAnimation, "ScrollThumbBackgroundColor");
+        Storyboard.SetTargetProperty(ScrollThumbMouseEnterColorAnimation, new PropertyPath(SolidColorBrush.ColorProperty));
+
+        Storyboard.SetTargetName(ScrollThumbMouseLeaveColorAnimation, "ScrollThumbBackgroundColor");
+        Storyboard.SetTargetProperty(ScrollThumbMouseLeaveColorAnimation, new PropertyPath(SolidColorBrush.ColorProperty));
+    }
+}
+#endregion
 
 #region AppSettings
 static public class AppSettings
@@ -1787,7 +2081,7 @@ function Program
             }
             finally
             {
-                $entry.HasZoneId = [Shell]::CheckZoneId($entry.Path)
+                $entry.HasZoneId = [Win32]::CheckZoneId($entry.Path)
             }
         }
         #[Data]::OnCurrentDirectoryChanged()
