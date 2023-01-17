@@ -466,7 +466,9 @@ abstract class CustomPanel : Grid, IDisposable
         DockPanel.SetDock(this._buttonStack, Dock.Right);
 
         this._textDock = new DockPanel{
-            Margin = new Thickness{Left = 10.0, Right = 10.0}
+            Margin = new Thickness{Left = 10.0, Right = 10.0},
+            HorizontalAlignment = HorizontalAlignment.Left,
+            LastChildFill = false
         };
         DockPanel.SetDock(this._textDock, Dock.Left);
 

@@ -281,12 +281,12 @@ class RootDirectoryListComboBox : ComboBox
 
     private void Popup_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        var mw = Window.GetWindow(this);
-        Point relP = Mouse.GetPosition(mw);
-        var element = mw.InputHitTest(relP);
+        var mainWindow = Window.GetWindow(this);
+        Point relP = Mouse.GetPosition(mainWindow);
+        var element = mainWindow.InputHitTest(relP);
         if (null == element) {
             this.IsDropDownOpen = false;
-            Point absP =mw.PointToScreen(relP);
+            Point absP = mainWindow.PointToScreen(relP);
             Win32.SendMouseDown((int)absP.X, (int)absP.Y);
         }
     }
@@ -365,14 +365,16 @@ class RootDirectoryListComboBox : ComboBox
         var border = new FrameworkElementFactory(typeof(Border), "DropDownBorder");
         border.SetValue(Border.BackgroundProperty, Theme.ComboBoxBackgroundBrush);
         border.SetValue(Border.MarginProperty, new Thickness(15.0));
-        var dropShadowEffect = new DropShadowEffect
+        border.SetValue(Border.BorderThicknessProperty, new Thickness(1.0));
+        border.SetValue(Border.BorderBrushProperty, Theme.GrayBrush);
+        /*var dropShadowEffect = new DropShadowEffect
         {
             Color = Colors.Black,
             BlurRadius = 15.0,
             ShadowDepth = 0,
             Opacity = 0.65
         };
-        border.SetValue(Popup.EffectProperty, dropShadowEffect);
+        border.SetValue(Popup.EffectProperty, dropShadowEffect);*/
         border.AppendChild(scrollViewer);
         
         var itemsGrid = new FrameworkElementFactory(typeof(Grid), "DropDown");
@@ -380,6 +382,7 @@ class RootDirectoryListComboBox : ComboBox
 
         var popup = new FrameworkElementFactory(typeof(Popup), "PART_Popup");
         popup.SetValue(Popup.PlacementProperty, PlacementMode.Left);
+        popup.SetValue(Popup.PlacementRectangleProperty, new Rect(0.0, 0.0, 0.0, 0.0));
         popup.SetValue(Popup.AllowsTransparencyProperty, true);
         var isPopupOpenBinding = new Binding("IsDropDownOpen"){
             RelativeSource = RelativeSource.TemplatedParent,
@@ -405,29 +408,26 @@ class DirectoryButton : ToggleButton, INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
 
-    private BitmapSource _rootDirectoryIcon;
-    public BitmapSource RootDirectoryIcon
+    private BitmapSource _directoryIcon;
+    public BitmapSource DirectoryIcon
     {
-        get { return this._rootDirectoryIcon; }
-        set { this._rootDirectoryIcon = value; PropertyChanged.Invoke(this, new PropertyChangedEventArgs("RootDirectoryIcon"));}
+        get { return this._directoryIcon; }
+        set { this._directoryIcon = value; PropertyChanged.Invoke(this, new PropertyChangedEventArgs("DirectoryIcon"));}
     }
 
     public DirectoryButton()
     {
         this.Cursor = Cursors.Hand;
-        this.RootDirectoryIcon = Theme.SystemDriveIcon;
+        this.DirectoryIcon = Theme.SystemDriveIcon;
         this.Template = CreateTemplate();
         Data.CurrentDirectoryChanged += (sender, e) => {
-            foreach (FileSystemInfoEntry entry in Data.RootDirectoryCollection)
-            {
-                if(entry.Path == Data.CurrentDirectory.Root.FullName)
-                {
-                    this.RootDirectoryIcon = entry.Icon;
-                    break;
-                }
-            }
+            this.DirectoryIcon = Win32.GetIconBitmapSource(Data.CurrentDirectory.FullName, Data.CurrentDirectory.Attributes);
         };
-        PropertyChanged.Invoke(this, new PropertyChangedEventArgs("RootDirectoryIcon"));
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        this.DirectoryIcon = Win32.GetIconBitmapSource(Data.CurrentDirectory.FullName, Data.CurrentDirectory.Attributes);
     }
 
     private ControlTemplate CreateTemplate()
@@ -435,11 +435,10 @@ class DirectoryButton : ToggleButton, INotifyPropertyChanged
         var image = new FrameworkElementFactory(typeof(Image));
         image.SetValue(Image.WidthProperty, 20.0);
         image.SetValue(Image.HeightProperty, 20.0);
-        image.SetValue(Image.MarginProperty, new Thickness{Top = 2.0});
         image.SetValue(Image.VerticalAlignmentProperty, VerticalAlignment.Center);
         image.SetValue(Image.HorizontalAlignmentProperty, HorizontalAlignment.Center);
 
-        var imageBinding = new Binding("RootDirectoryIcon"){
+        var imageBinding = new Binding("DirectoryIcon"){
             Source = this
         };
         image.SetBinding(Image.SourceProperty, imageBinding);
@@ -453,11 +452,20 @@ class DirectoryButton : ToggleButton, INotifyPropertyChanged
             VisualTree = border,
         };
 
-        var mouseOverTrigger = new MultiTrigger();
-        mouseOverTrigger.Conditions.Add(new Condition(DirectoryButton.IsMouseOverProperty, true));
-        mouseOverTrigger.Conditions.Add(new Condition(DirectoryButton.IsMouseCapturedProperty, false));
+        var mouseOverTrigger = new Trigger{
+            Property = DirectoryButton.IsMouseOverProperty,
+            Value = true,
+        };
         mouseOverTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Theme.DirectoryButtonMouseOverBackgroundBrush, "border"));
+
+        var isCheckedTrigger = new Trigger{
+            Property = DirectoryButton.IsCheckedProperty,
+            Value = true,
+        };
+        isCheckedTrigger.Setters.Add(new Setter(Border.BackgroundProperty, Theme.DirectoryButtonIsCheckedBackgroundBrush, "border"));
+
         ct.Triggers.Add(mouseOverTrigger);
+        ct.Triggers.Add(isCheckedTrigger);
 
         return ct;
     }
@@ -1139,13 +1147,17 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
     public bool _isDirectory;
     public bool _hasZoneId = false;
 
-    public FileSystemInfoEntry(FileSystemInfo fsi)
+    public FileSystemInfoEntry(FileSystemInfo fsi, bool reqIcon)
     {
         this._path = fsi.FullName;
         this._name = fsi.Name;
         this._lastWriteTime = fsi.LastWriteTime;
         this._isDirectory = (bool)((fsi.Attributes & FileAttributes.Directory) == FileAttributes.Directory);
-        if (!this._isDirectory)
+        if (reqIcon)
+        {
+            this._icon = Win32.GetIconBitmapSource(this._path, fsi.Attributes);
+        }
+        else if (!this._isDirectory)
         {
             //this._hasZoneId = Win32.CheckZoneId(this._path);
             Data.ZoneIDCheckQueueList.Add(this);
@@ -1157,15 +1169,12 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
         }
         else
         {
-            if (fsi.FullName ==  System.IO.Path.GetPathRoot(fsi.FullName))
-            {
-                this._icon = Win32.GetIconBitmapSource(this._path, fsi.Attributes);
-            }
-            else
-            {
-                this._icon = Theme.DirectoryIcon;
-            }
+            this._icon = Theme.DirectoryIcon;
         }
+    }
+
+    public FileSystemInfoEntry(FileSystemInfo fsi) : this(fsi, false)
+    {
     }
 
     /*~FileSystemInfoEntry()
@@ -1232,6 +1241,422 @@ public class FileSystemInfoEntry : INotifyPropertyChanged
     }
 }
 #endregion FileSystemInfoEntry
+
+#region CustomResourceDictionary
+class CustomResourceDictionary : ResourceDictionary
+{
+    public CustomResourceDictionary()
+    {
+        this.Add("ScrollBarControlTemplate", CreateCustomScrollBarControlTemplate(Orientation.Horizontal));
+        this.Add(typeof(ScrollBar), CreateCustomScrollBarStyle());
+    }
+
+    private ControlTemplate CreateCustomScrollBarControlTemplate(Orientation orientation)
+    {
+        var track = new FrameworkElementFactory(typeof(CustomTrack), "PART_Track");
+
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BackgroundProperty, Theme.ScrollBarBackgroundBrush);
+        border.AppendChild(track);
+
+        var grid = new FrameworkElementFactory(typeof(Grid), "Bg");
+        grid.SetValue(Grid.SnapsToDevicePixelsProperty, true);
+        grid.AppendChild(border);
+
+        var ct = new ControlTemplate(typeof(ScrollBar)){
+            VisualTree = grid,
+        };
+        return ct;
+    }
+
+    private Style CreateCustomScrollBarStyle()
+    {
+        var style = new Style(typeof(ScrollBar));
+        style.Setters.Add(new Setter(ScrollBar.WidthProperty, 15.0));
+        style.Setters.Add(new Setter(ScrollBar.MarginProperty, new Thickness{Left = 5.0}));
+        style.Setters.Add(new Setter(ScrollBar.TemplateProperty, this["ScrollBarControlTemplate"]));
+        var visibilityTrigger = new Trigger{
+            Property = ScrollBar.IsEnabledProperty,
+            Value = false,
+        };
+        visibilityTrigger.Setters.Add(new Setter(ScrollBar.VisibilityProperty, Visibility.Hidden));
+        style.Triggers.Add(visibilityTrigger);
+        return style;
+    }
+}
+#endregion CustomResourceDictionary
+
+#region CustomTrack
+class CustomTrack : Track, INotifyPropertyChanged
+{
+    private Thickness _borderMargin;
+    public Thickness BorderMargin
+    {
+        get { return _borderMargin; }
+        set { _borderMargin = value; OnPropertyChanged("BorderMargin"); }
+    }
+
+    private Storyboard _thumbMouseEnterAnimationStoryboard = new Storyboard();
+    private Storyboard _thumbMouseLeaveAnimationStoryboard = new Storyboard();
+
+    private SolidColorBrush _thumbBackgroundBrush = new SolidColorBrush(Colors.Gray);
+
+    public CustomTrack()
+    {
+        this.Thumb = new Thumb{
+            Template = CreateThumbTemplate(),
+        };
+        this.Resources.Add(SystemParameters.VerticalScrollBarButtonHeightKey, 100.0);
+        this.IsDirectionReversed = true;
+
+        this.IncreaseRepeatButton = new RepeatButton{
+            Template = CreateDecreaseRepeatButtonTemplate(),
+        };
+        this.DecreaseRepeatButton = new RepeatButton{
+            Template = CreateIncreaseRepeatButtonTemplate(),
+        };
+
+        NameScope.SetNameScope(this, new NameScope());
+        this.RegisterName("ScrollThumbBackgroundColor", this._thumbBackgroundBrush);
+
+        this._thumbMouseEnterAnimationStoryboard.Children.Add(Theme.ScrollThumbMouseEnterColorAnimation);
+        this._thumbMouseLeaveAnimationStoryboard.Children.Add(Theme.ScrollThumbMouseLeaveColorAnimation);
+
+        this.MouseEnter += (sender, e) => {
+            this._thumbMouseEnterAnimationStoryboard.Begin(this);
+        };
+        this.MouseLeave += (sender, e) => {
+            this._thumbMouseLeaveAnimationStoryboard.Begin(this);
+        };
+    }
+
+    private ControlTemplate CreateThumbTemplate()
+    {
+        var border = new FrameworkElementFactory(typeof(Border));
+
+        var bindingBackground = new Binding{
+            BindsDirectlyToSource = true,
+            Source = this._thumbBackgroundBrush,
+        };
+        border.SetBinding(Border.BackgroundProperty, bindingBackground);
+        var bindingBorderMargin = new Binding("BorderMargin"){
+            Source = this,
+        };
+        border.SetBinding(Border.MarginProperty, bindingBorderMargin);
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(6.0));
+        
+        var ct = new ControlTemplate(){
+            VisualTree = border,
+        };
+        return ct;
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        if (Orientation.Horizontal == this.Orientation) {
+            this.BorderMargin = new Thickness{Bottom = 5.0};
+            this.DecreaseRepeatButton.Command = ScrollBar.PageLeftCommand;
+            this.IncreaseRepeatButton.Command = ScrollBar.PageRightCommand;
+        } else {
+            this.BorderMargin = new Thickness{Right = 5.0};
+            this.DecreaseRepeatButton.Command = ScrollBar.PageUpCommand;
+            this.IncreaseRepeatButton.Command = ScrollBar.PageDownCommand;
+        }
+    }
+
+    private static ControlTemplate CreateIncreaseRepeatButtonTemplate()
+    {
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        var ct = new ControlTemplate(){
+            VisualTree = border,
+        };
+        return ct;
+    }
+
+    private static ControlTemplate CreateDecreaseRepeatButtonTemplate()
+    {
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        var ct = new ControlTemplate(){
+            VisualTree = border,
+        };
+        return ct;
+    }
+
+    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+
+    private void OnPropertyChanged(string info)
+    {
+        PropertyChanged.Invoke(this, new PropertyChangedEventArgs(info));
+    }
+}
+#endregion CustomTrack
+
+#region RequestRemoveZoneIdEventArgs
+public class RequestRemoveZoneIdEventArgs : EventArgs
+{
+    public List<FileSystemInfoEntry> FileSystemInfoList;
+    public bool Recurse;
+
+    public RequestRemoveZoneIdEventArgs(List<FileSystemInfoEntry> fsiList, bool recurse)
+    {
+        this.FileSystemInfoList = fsiList;
+        this.Recurse = recurse;
+    }
+}
+#endregion
+
+public class StatusContentEntry : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
+
+    private string _text;
+    public string Text
+    {
+        get { return this._text; }
+        set {
+            this._text = value;
+            PropertyChanged.Invoke(this, new PropertyChangedEventArgs("Text"));
+            PropertyChanged.Invoke(this, new PropertyChangedEventArgs("Visibility"));
+        }
+    }
+
+    public Visibility Visibility
+    {
+        get { return (this._text == String.Empty ? Visibility.Collapsed : Visibility.Visible); }
+    }
+
+    public StatusContentEntry(string value)
+    {
+        this.Text = value;
+    }
+}
+
+#region Data
+public static class Data
+{
+    public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
+    public static List<FileSystemInfoEntry> ZoneIDCheckQueueList = new List<FileSystemInfoEntry>();
+    public static CollectionViewSource FileInfoCollectionView;
+    public static object _lockObject = new object();
+    public static CancellationTokenSource cTokenSource = null;
+
+    public static Dictionary<string, StatusContentEntry> StatusContent { get; set; }
+
+    public static Dictionary<string, BitmapSource> IconsDictionary = new Dictionary<string, BitmapSource>();
+
+    public static ObservableCollection<FileSystemInfoEntry> RootDirectoryCollection = new ObservableCollection<FileSystemInfoEntry>();
+
+    static Data()
+    {
+        FileInfoCollectionView = new CollectionViewSource{
+            Source = FileInfoCollection,
+            IsLiveSortingRequested = true,
+        };
+        FileInfoCollectionView.SortDescriptions.Add(new SortDescription(AppSettings.DefaultSortProperty, AppSettings.DefaultSortDirection));
+        BindingOperations.EnableCollectionSynchronization(FileInfoCollection, _lockObject);
+
+        StatusContent = new Dictionary<string, StatusContentEntry>()
+        {
+            { "ItemsCount", new StatusContentEntry(String.Empty) },
+            { "SelectedItemsCount", new StatusContentEntry(String.Empty) },
+        };
+
+        FileInfoCollection.CollectionChanged += (sender, e) => {
+            if (2 <= FileInfoCollection.Count)
+                Data.StatusContent["ItemsCount"].Text = String.Format("{0} items", FileInfoCollection.Count);
+            else
+                Data.StatusContent["ItemsCount"].Text = String.Format("{0} item", FileInfoCollection.Count);
+        };
+        CreateRootDirectoryItems();
+    }
+
+    private static void CreateRootDirectoryItems()
+    {
+        DriveInfo[] allDrives = DriveInfo.GetDrives();
+
+        foreach (DriveInfo d in allDrives)
+        {
+            try {
+                Data.RootDirectoryCollection.Add(new FileSystemInfoEntry(d.RootDirectory, true));
+            } catch { }
+        }
+
+        foreach (Environment.SpecialFolder f in Enum.GetValues(typeof(AppSettings.UserFolders)))
+        {
+            try {
+                var path = Environment.GetFolderPath(f);
+                if (String.Empty != path)
+                {
+                    var di = new DirectoryInfo(path);
+                    Data.RootDirectoryCollection.Add(new FileSystemInfoEntry(di, true));
+                }
+            } catch { }
+        }
+    }
+
+    public static DirectoryInfo _currentDirectory = new DirectoryInfo(AppSettings.DefaultFolder);
+    public static DirectoryInfo CurrentDirectory
+    {
+        get
+        {
+            if (null == _currentDirectory)
+            {
+                _currentDirectory = new DirectoryInfo(AppSettings.DesktopFolder);
+            }
+            return _currentDirectory;
+        }
+        set
+        {
+            if (null == value || false == value.Exists) {
+                return;
+            }
+
+            if (null != _currentDirectory)
+            {
+                if (0 == _prevDirectories.Count || _prevDirectories[_prevDirectories.Count - 1] != _currentDirectory.FullName)
+                {
+                    _prevDirectories.Add(_currentDirectory.FullName);
+                }
+            }
+            if (AppSettings.HistoryLimit <= _prevDirectories.Count)
+            {
+                _prevDirectories.RemoveAt(0);
+            }
+            if (_nextDirectories.Count > 0)
+            {
+                _nextDirectories.Clear();
+            }
+            _currentDirectory = value;
+            OnCurrentDirectoryChanged();
+        }
+    }
+
+    private static StringCollection _prevDirectories = new StringCollection();
+    private static StringCollection _nextDirectories = new StringCollection();
+    public static void PrevDirectory()
+    {
+        if (0 < _prevDirectories.Count)
+        {
+            string path = _prevDirectories[_prevDirectories.Count - 1];
+            _prevDirectories.RemoveAt(_prevDirectories.Count - 1);
+            _nextDirectories.Add(CurrentDirectory.FullName);
+            _currentDirectory = new DirectoryInfo(path);
+            OnCurrentDirectoryChanged();
+        }
+    }
+
+    public static void NextDirectory()
+    {
+        if (0 < _nextDirectories.Count)
+        {
+            string path = _nextDirectories[_nextDirectories.Count - 1];
+            _nextDirectories.RemoveAt(_nextDirectories.Count - 1);
+            _prevDirectories.Add(CurrentDirectory.FullName);
+            _currentDirectory = new DirectoryInfo(path);
+            OnCurrentDirectoryChanged();
+        }
+    }
+
+    public static event PropertyChangedEventHandler CurrentDirectoryChanged = (sender, e) => { };
+
+    public static async void OnCurrentDirectoryChanged()
+    {
+        CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
+
+        if (!(CurrentDirectory.Exists))
+        {
+            return;
+        }
+
+        if (null != cTokenSource)
+        {
+            cTokenSource.Cancel();
+        }
+
+        if (IconsDictionary.Count > 512)
+        {
+            IconsDictionary.Clear();
+        }
+
+        lock (_lockObject)
+        {
+            FileInfoCollection.Clear();
+        }
+
+        if (null == cTokenSource)
+        {
+            cTokenSource = new CancellationTokenSource();
+        }
+        else
+        {
+            cTokenSource.Dispose();
+            cTokenSource = new CancellationTokenSource();
+        }
+
+        await GetCollectionAsync();
+
+        //Console.WriteLine(String.Format("ZoneIDCheckQueueList.Count : {0}", ZoneIDCheckQueueList.Count));
+        //Console.WriteLine(String.Format("IconsDictionary.Count : {0}", IconsDictionary.Count));
+    }
+
+    public static Task GetCollectionAsync()
+    {
+        CancellationToken token = cTokenSource.Token;
+        return Task.Run(() => GetCollection(token), cTokenSource.Token).ContinueWith(t => {
+            cTokenSource.Dispose();
+            cTokenSource = null;
+        });
+    }
+
+    public static void GetCollection(CancellationToken token)
+    {
+        lock (_lockObject)
+        {
+            foreach (var info in CurrentDirectory.EnumerateFileSystemInfos())
+            {
+                if (token.IsCancellationRequested)
+                {
+                    //token.ThrowIfCancellationRequested();
+                    return;
+                }
+                FileInfoCollection.Add(new FileSystemInfoEntry(info));
+            }
+            foreach (FileSystemInfoEntry entry in ZoneIDCheckQueueList)
+            {
+                if (token.IsCancellationRequested)
+                {
+                    //token.ThrowIfCancellationRequested();
+                    break;
+                }
+                entry.HasZoneId = Win32.CheckZoneId(entry.Path);
+            }
+            ZoneIDCheckQueueList.Clear();
+        }
+    }
+
+    public delegate void RequestRemoveZoneIdEventHandler(object sender, RequestRemoveZoneIdEventArgs e);
+    public static event RequestRemoveZoneIdEventHandler RequestRemoveZoneId = (sender, e) => { };
+
+    public static void OnRequestRemoveZoneId(FilerPanel filer, bool recurseMode)
+    {
+        if (0 == filer.SelectedItems.Count)
+        {
+            return;
+        }
+        else if (0 < filer.SelectedItems.Count)
+        {
+            List<FileSystemInfoEntry> fsiList = new List<FileSystemInfoEntry>();
+            foreach (FileSystemInfoEntry entry in filer.SelectedItems) {
+                fsiList.Add(entry);
+            }
+            var ev = new RequestRemoveZoneIdEventArgs(fsiList, recurseMode);
+            RequestRemoveZoneId.Invoke(filer, ev);
+        }
+    }
+}
+#endregion Data
 
 #region Win32
 public static class Win32
@@ -1419,411 +1844,6 @@ public static class Win32
 }
 #endregion Win32
 
-#region CustomResourceDictionary
-class CustomResourceDictionary : ResourceDictionary
-{
-    public CustomResourceDictionary()
-    {
-        this.Add("ScrollBarControlTemplate", CreateCustomScrollBarControlTemplate(Orientation.Horizontal));
-        this.Add(typeof(ScrollBar), CreateCustomScrollBarStyle());
-    }
-
-    private ControlTemplate CreateCustomScrollBarControlTemplate(Orientation orientation)
-    {
-        var track = new FrameworkElementFactory(typeof(CustomTrack), "PART_Track");
-
-        var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.BackgroundProperty, Theme.ScrollBarBackgroundBrush);
-        border.AppendChild(track);
-
-        var grid = new FrameworkElementFactory(typeof(Grid), "Bg");
-        grid.SetValue(Grid.SnapsToDevicePixelsProperty, true);
-        grid.AppendChild(border);
-
-        var ct = new ControlTemplate(typeof(ScrollBar)){
-            VisualTree = grid,
-        };
-        return ct;
-    }
-
-    private Style CreateCustomScrollBarStyle()
-    {
-        var style = new Style(typeof(ScrollBar));
-        style.Setters.Add(new Setter(ScrollBar.WidthProperty, 15.0));
-        style.Setters.Add(new Setter(ScrollBar.MarginProperty, new Thickness{Left = 5.0}));
-        style.Setters.Add(new Setter(ScrollBar.TemplateProperty, this["ScrollBarControlTemplate"]));
-        var visibilityTrigger = new Trigger{
-            Property = ScrollBar.IsEnabledProperty,
-            Value = false,
-        };
-        visibilityTrigger.Setters.Add(new Setter(ScrollBar.VisibilityProperty, Visibility.Hidden));
-        style.Triggers.Add(visibilityTrigger);
-        return style;
-    }
-}
-#endregion CustomResourceDictionary
-
-#region CustomTrack
-class CustomTrack : Track, INotifyPropertyChanged
-{
-    private Thickness _borderMargin;
-    public Thickness BorderMargin
-    {
-        get { return _borderMargin; }
-        set { _borderMargin = value; OnPropertyChanged("BorderMargin"); }
-    }
-
-    private Storyboard _thumbMouseEnterAnimationStoryboard = new Storyboard();
-    private Storyboard _thumbMouseLeaveAnimationStoryboard = new Storyboard();
-
-    private SolidColorBrush _thumbBackgroundBrush = new SolidColorBrush(Colors.Gray);
-
-    public CustomTrack()
-    {
-        this.Thumb = new Thumb{
-            Template = CreateThumbTemplate(),
-        };
-        this.Resources.Add(SystemParameters.VerticalScrollBarButtonHeightKey, 100.0);
-        this.IsDirectionReversed = true;
-
-        this.IncreaseRepeatButton = new RepeatButton{
-            Template = CreateDecreaseRepeatButtonTemplate(),
-        };
-        this.DecreaseRepeatButton = new RepeatButton{
-            Template = CreateIncreaseRepeatButtonTemplate(),
-        };
-
-        NameScope.SetNameScope(this, new NameScope());
-        this.RegisterName("ScrollThumbBackgroundColor", this._thumbBackgroundBrush);
-
-        this._thumbMouseEnterAnimationStoryboard.Children.Add(Theme.ScrollThumbMouseEnterColorAnimation);
-        this._thumbMouseLeaveAnimationStoryboard.Children.Add(Theme.ScrollThumbMouseLeaveColorAnimation);
-
-        this.MouseEnter += (sender, e) => {
-            this._thumbMouseEnterAnimationStoryboard.Begin(this);
-        };
-        this.MouseLeave += (sender, e) => {
-            this._thumbMouseLeaveAnimationStoryboard.Begin(this);
-        };
-    }
-
-    private ControlTemplate CreateThumbTemplate()
-    {
-        var border = new FrameworkElementFactory(typeof(Border));
-
-        var bindingBackground = new Binding{
-            BindsDirectlyToSource = true,
-            Source = this._thumbBackgroundBrush,
-        };
-        border.SetBinding(Border.BackgroundProperty, bindingBackground);
-        var bindingBorderMargin = new Binding("BorderMargin"){
-            Source = this,
-        };
-        border.SetBinding(Border.MarginProperty, bindingBorderMargin);
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(6.0));
-        
-        var ct = new ControlTemplate(){
-            VisualTree = border,
-        };
-        return ct;
-    }
-
-    protected override void OnRender(DrawingContext dc)
-    {
-        if (Orientation.Horizontal == this.Orientation) {
-            this.BorderMargin = new Thickness{Bottom = 5.0};
-            this.DecreaseRepeatButton.Command = ScrollBar.PageLeftCommand;
-            this.IncreaseRepeatButton.Command = ScrollBar.PageRightCommand;
-        } else {
-            this.BorderMargin = new Thickness{Right = 5.0};
-            this.DecreaseRepeatButton.Command = ScrollBar.PageUpCommand;
-            this.IncreaseRepeatButton.Command = ScrollBar.PageDownCommand;
-
-        }
-    }
-
-    private static ControlTemplate CreateIncreaseRepeatButtonTemplate()
-    {
-        var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
-        var ct = new ControlTemplate(){
-            VisualTree = border,
-        };
-        return ct;
-    }
-
-    private static ControlTemplate CreateDecreaseRepeatButtonTemplate()
-    {
-        var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
-        var ct = new ControlTemplate(){
-            VisualTree = border,
-        };
-        return ct;
-    }
-
-    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
-
-    private void OnPropertyChanged(string info)
-    {
-        PropertyChanged.Invoke(this, new PropertyChangedEventArgs(info));
-    }
-}
-#endregion CustomTrack
-
-#region RequestRemoveZoneIdEventArgs
-public class RequestRemoveZoneIdEventArgs : EventArgs
-{
-    public List<FileSystemInfoEntry> FileSystemInfoList;
-    public bool Recurse;
-
-    public RequestRemoveZoneIdEventArgs(List<FileSystemInfoEntry> fsiList, bool recurse)
-    {
-        this.FileSystemInfoList = fsiList;
-        this.Recurse = recurse;
-    }
-}
-#endregion
-
-public class StatusContentEntry : INotifyPropertyChanged
-{
-    public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
-
-    private string _text;
-    public string Text
-    {
-        get { return this._text; }
-        set {
-            this._text = value;
-            PropertyChanged.Invoke(this, new PropertyChangedEventArgs("Text"));
-            PropertyChanged.Invoke(this, new PropertyChangedEventArgs("Visibility"));
-        }
-    }
-
-    public Visibility Visibility
-    {
-        get { return (this._text == String.Empty ? Visibility.Collapsed : Visibility.Visible); }
-    }
-
-    public StatusContentEntry(string value)
-    {
-        this.Text = value;
-    }
-}
-
-#region Data
-public static class Data
-{
-    public static ObservableCollection<FileSystemInfoEntry> FileInfoCollection = new ObservableCollection<FileSystemInfoEntry>();
-    public static List<FileSystemInfoEntry> ZoneIDCheckQueueList = new List<FileSystemInfoEntry>();
-    public static CollectionViewSource FileInfoCollectionView;
-    public static object _lockObject = new object();
-    public static CancellationTokenSource cTokenSource = null;
-
-    public static Dictionary<string, StatusContentEntry> StatusContent { get; set; }
-
-    public static Dictionary<string, BitmapSource> IconsDictionary = new Dictionary<string, BitmapSource>();
-
-    public static ObservableCollection<FileSystemInfoEntry> RootDirectoryCollection = new ObservableCollection<FileSystemInfoEntry>();
-
-    static Data()
-    {
-        FileInfoCollectionView = new CollectionViewSource{
-            Source = FileInfoCollection,
-            IsLiveSortingRequested = true,
-        };
-        FileInfoCollectionView.SortDescriptions.Add(new SortDescription(AppSettings.DefaultSortProperty, AppSettings.DefaultSortDirection));
-        BindingOperations.EnableCollectionSynchronization(FileInfoCollection, _lockObject);
-
-        StatusContent = new Dictionary<string, StatusContentEntry>()
-        {
-            { "ItemsCount", new StatusContentEntry(String.Empty) },
-            { "SelectedItemsCount", new StatusContentEntry(String.Empty) },
-        };
-
-        FileInfoCollection.CollectionChanged += (sender, e) => {
-            if (2 <= FileInfoCollection.Count)
-                Data.StatusContent["ItemsCount"].Text = String.Format("{0} items", FileInfoCollection.Count);
-            else
-                Data.StatusContent["ItemsCount"].Text = String.Format("{0} item", FileInfoCollection.Count);
-        };
-        CreateRootDirectoryItems();
-    }
-
-    private static void CreateRootDirectoryItems()
-    {
-        DriveInfo[] allDrives = DriveInfo.GetDrives();
-
-        foreach (DriveInfo d in allDrives)
-        {
-            try {
-                Data.RootDirectoryCollection.Add(new FileSystemInfoEntry(d.RootDirectory));
-            } catch { }
-        }
-    }
-
-    public static DirectoryInfo _currentDirectory = new DirectoryInfo(AppSettings.DefaultFolder);
-    public static DirectoryInfo CurrentDirectory
-    {
-        get
-        {
-            if (null == _currentDirectory)
-            {
-                _currentDirectory = new DirectoryInfo(AppSettings.DesktopFolder);
-            }
-            return _currentDirectory;
-        }
-        set
-        {
-            if (null == value || false == value.Exists) {
-                return;
-            }
-
-            if (null != _currentDirectory)
-            {
-                if (0 == _prevDirectories.Count || _prevDirectories[_prevDirectories.Count - 1] != _currentDirectory.FullName)
-                {
-                    _prevDirectories.Add(_currentDirectory.FullName);
-                }
-            }
-            if (AppSettings.HistoryLimit <= _prevDirectories.Count)
-            {
-                _prevDirectories.RemoveAt(0);
-            }
-            if (_nextDirectories.Count > 0)
-            {
-                _nextDirectories.Clear();
-            }
-            _currentDirectory = value;
-            OnCurrentDirectoryChanged();
-        }
-    }
-
-    private static StringCollection _prevDirectories = new StringCollection();
-    private static StringCollection _nextDirectories = new StringCollection();
-    public static void PrevDirectory()
-    {
-        if (0 < _prevDirectories.Count)
-        {
-            string path = _prevDirectories[_prevDirectories.Count - 1];
-            _prevDirectories.RemoveAt(_prevDirectories.Count - 1);
-            _nextDirectories.Add(CurrentDirectory.FullName);
-            _currentDirectory = new DirectoryInfo(path);
-            OnCurrentDirectoryChanged();
-        }
-    }
-
-    public static void NextDirectory()
-    {
-        if (0 < _nextDirectories.Count)
-        {
-            string path = _nextDirectories[_nextDirectories.Count - 1];
-            _nextDirectories.RemoveAt(_nextDirectories.Count - 1);
-            _prevDirectories.Add(CurrentDirectory.FullName);
-            _currentDirectory = new DirectoryInfo(path);
-            OnCurrentDirectoryChanged();
-        }
-    }
-
-    public static event PropertyChangedEventHandler CurrentDirectoryChanged = (sender, e) => { };
-
-    public static async void OnCurrentDirectoryChanged()
-    {
-        CurrentDirectoryChanged.Invoke(null, new PropertyChangedEventArgs("CurrentDirectory"));
-
-        if (!(CurrentDirectory.Exists))
-        {
-            return;
-        }
-
-        if (null != cTokenSource)
-        {
-            cTokenSource.Cancel();
-        }
-
-        if (IconsDictionary.Count > 512)
-        {
-            IconsDictionary.Clear();
-        }
-
-        lock (_lockObject)
-        {
-            FileInfoCollection.Clear();
-        }
-
-        if (null == cTokenSource)
-        {
-            cTokenSource = new CancellationTokenSource();
-        }
-        else
-        {
-            cTokenSource.Dispose();
-            cTokenSource = new CancellationTokenSource();
-        }
-
-        await GetCollectionAsync();
-
-        //Console.WriteLine(String.Format("ZoneIDCheckQueueList.Count : {0}", ZoneIDCheckQueueList.Count));
-        //Console.WriteLine(String.Format("IconsDictionary.Count : {0}", IconsDictionary.Count));
-    }
-
-    public static Task GetCollectionAsync()
-    {
-        CancellationToken token = cTokenSource.Token;
-        return Task.Run(() => GetCollection(token), cTokenSource.Token).ContinueWith(t => {
-            cTokenSource.Dispose();
-            cTokenSource = null;
-        });
-    }
-
-    public static void GetCollection(CancellationToken token)
-    {
-        lock (_lockObject)
-        {
-            foreach (var info in CurrentDirectory.EnumerateFileSystemInfos())
-            {
-                if (token.IsCancellationRequested)
-                {
-                    //token.ThrowIfCancellationRequested();
-                    return;
-                }
-                FileInfoCollection.Add(new FileSystemInfoEntry(info));
-            }
-            foreach (FileSystemInfoEntry entry in ZoneIDCheckQueueList)
-            {
-                if (token.IsCancellationRequested)
-                {
-                    //token.ThrowIfCancellationRequested();
-                    break;
-                }
-                entry.HasZoneId = Win32.CheckZoneId(entry.Path);
-            }
-            ZoneIDCheckQueueList.Clear();
-        }
-    }
-
-    public delegate void RequestRemoveZoneIdEventHandler(object sender, RequestRemoveZoneIdEventArgs e);
-    public static event RequestRemoveZoneIdEventHandler RequestRemoveZoneId = (sender, e) => { };
-
-    public static void OnRequestRemoveZoneId(FilerPanel filer, bool recurseMode)
-    {
-        if (0 == filer.SelectedItems.Count)
-        {
-            return;
-        }
-        else if (0 < filer.SelectedItems.Count)
-        {
-            List<FileSystemInfoEntry> fsiList = new List<FileSystemInfoEntry>();
-            foreach (FileSystemInfoEntry entry in filer.SelectedItems) {
-                fsiList.Add(entry);
-            }
-            var ev = new RequestRemoveZoneIdEventArgs(fsiList, recurseMode);
-            RequestRemoveZoneId.Invoke(filer, ev);
-        }
-    }
-}
-#endregion Data
-
 #region Theme
 public class Theme
 {
@@ -1880,10 +1900,13 @@ public class Theme
     public static Color DirectoryButtonBackgroundColor = new Color {A = 255, R = 40, G = 40, B = 40};
     public static Brush DirectoryButtonBackgroundBrush = new SolidColorBrush(DirectoryButtonBackgroundColor);
 
-    public static Color DirectoryButtonMouseOverBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
+    public static Color DirectoryButtonMouseOverBackgroundColor = new Color {A = 255, R = 70, G = 70, B = 70};
     public static Brush DirectoryButtonMouseOverBackgroundBrush = new SolidColorBrush(DirectoryButtonMouseOverBackgroundColor);
 
-    public static Color ComboBoxBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
+    public static Color DirectoryButtonIsCheckedBackgroundColor = new Color {A = 255, R = 60, G = 60, B = 60};
+    public static Brush DirectoryButtonIsCheckedBackgroundBrush = new SolidColorBrush(DirectoryButtonIsCheckedBackgroundColor);
+
+    public static Color ComboBoxBackgroundColor = new Color {A = 255, R = 45, G = 45, B = 45};
     public static Brush ComboBoxBackgroundBrush = new SolidColorBrush(ComboBoxBackgroundColor);
 
     public static Color ComboBoxMouseOverBackgroundColor = new Color {A = 255, R = 90, G = 90, B = 90};
@@ -2042,6 +2065,16 @@ static public class AppSettings
             }
             return _defaultFolder;
         }
+    }
+
+    public enum UserFolders
+    {
+        Desktop = Environment.SpecialFolder.Desktop,
+        User = Environment.SpecialFolder.UserProfile,
+        Music = Environment.SpecialFolder.MyMusic,
+        Pictures = Environment.SpecialFolder.MyPictures,
+        Videos = Environment.SpecialFolder.MyVideos,
+        Documents = Environment.SpecialFolder.MyDocuments,
     }
 }
 #endregion AppSettings
