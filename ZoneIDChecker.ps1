@@ -42,6 +42,7 @@ using System;
 using System.IO;
 using System.Drawing;
 using System.Windows;
+using System.Windows.Shapes;
 using System.Windows.Input;
 using System.Windows.Data;
 using System.Windows.Media;
@@ -937,7 +938,6 @@ class TileButton : ButtonBase, INotifyPropertyChanged
 #region FilerPanel
 public class FilerPanel : DataGrid
 {
-    private object _lockObject = new object();
     public FilerPanel()
     {
         this.Margin = new Thickness{Left = 5.0, Top = 15.0};
@@ -951,15 +951,13 @@ public class FilerPanel : DataGrid
         this.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
         this.VerticalScrollBarVisibility = ScrollBarVisibility.Visible;
         VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
-        Binding binding = new Binding() {
-            Source = Data.FileInfoCollectionView
-        };
-        this.SetBinding(FilerPanel.ItemsSourceProperty, binding);
+        this.ItemsSource = Data.FileInfoCollection;
         this.ItemContainerStyle = CreateItemContainerStyle();
         this.CellStyle = CreateCellStyle();
         this.ColumnHeaderStyle = CreateColumnHeaderStyle();
         this.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
         this.HorizontalGridLinesBrush = Theme.GrayBorderBrush;
+
         this.Columns.Add(new DataGridTemplateColumn{
             Header = "Name",
             CellTemplate = CreateNameCellTemplate(),
@@ -990,12 +988,12 @@ public class FilerPanel : DataGrid
             CanUserSort = true
         });
 
-        this.Columns.Add(new DataGridTextColumn{
+        /*this.Columns.Add(new DataGridTextColumn{
             //Width = new DataGridLength(50.0),
             ElementStyle = CreateTextBlockStyle(),
             IsReadOnly = true,
-        });
-
+        });*/
+        this.Columns[2].SortDirection = ListSortDirection.Descending;
         this.AddHandler(DataGridRow.PreviewMouseDoubleClickEvent, new MouseButtonEventHandler(DataGridRow_DoubleClick));
     }
 
@@ -1037,6 +1035,7 @@ public class FilerPanel : DataGrid
         var template = new DataTemplate{
             VisualTree = dockPanel
         };
+
         return template;
     }
 
@@ -1056,16 +1055,124 @@ public class FilerPanel : DataGrid
         return template;
     }
 
-    private static Style CreateColumnHeaderStyle()
+    private Style CreateColumnHeaderStyle()
     {
-        var style = new Style();
-        style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness{Right = 1.0}));
-        style.Setters.Add(new Setter(Control.BorderBrushProperty, Theme.GrayBrush));
-        style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
-        style.Setters.Add(new Setter(Control.FontSizeProperty, 16.0));
-        style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Medium));
-        style.Setters.Add(new Setter(Control.MarginProperty, new Thickness{Left = 15.0, Bottom = 15.0}));
+        var style = new Style(typeof(DataGridColumnHeader));
+        //style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness{Right = 1.0}));
+        //style.Setters.Add(new Setter(Control.BorderBrushProperty, Theme.GrayBrush));
+        //style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        style.Setters.Add(new Setter(Control.FontSizeProperty, 15.0));
+        //style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Medium));
+        //style.Setters.Add(new Setter(Control.ForegroundProperty, Theme.GrayBrush));
+        style.Setters.Add(new Setter(Control.TemplateProperty, CreateColumnHeaderTemplate()));
         return style;
+    }
+
+    private ControlTemplate CreateColumnHeaderTemplate()
+    {
+
+        var content = new FrameworkElementFactory(typeof(ContentPresenter), "ContentPresenter");
+        content.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+        content.SetValue(ContentPresenter.MarginProperty, new Thickness{Left = 20.0, Right = 10.0});
+
+        var contentBorder = new FrameworkElementFactory(typeof(Border), "ContentBorder");
+        contentBorder.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        contentBorder.SetValue(Grid.RowProperty, 1);
+        contentBorder.AppendChild(content);
+
+        var thumbRect = new FrameworkElementFactory(typeof(Rectangle));
+        thumbRect.SetValue(Rectangle.WidthProperty, 2.0);
+        thumbRect.SetValue(Rectangle.StrokeProperty, Theme.GrayBrush);
+        thumbRect.SetValue(Rectangle.CursorProperty, Cursors.SizeWE);
+
+        var thumbTemplate = new ControlTemplate(typeof(Thumb)){
+            VisualTree = thumbRect,
+        };
+
+        var thumbLeft = new FrameworkElementFactory(typeof(Thumb), "PART_LeftHeaderGripper");
+        thumbLeft.SetValue(Thumb.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+        thumbLeft.SetValue(Thumb.TemplateProperty, thumbTemplate);
+        thumbLeft.SetValue(Grid.RowProperty, 1);
+
+        var thumbRight = new FrameworkElementFactory(typeof(Thumb), "PART_RightHeaderGripper");
+        thumbRight.SetValue(Thumb.HorizontalAlignmentProperty, HorizontalAlignment.Right);
+        thumbRight.SetValue(Grid.ColumnProperty, 1);
+        thumbRight.SetValue(Thumb.TemplateProperty, thumbTemplate);
+        thumbRight.SetValue(Grid.RowProperty, 1);
+
+        var grid = new FrameworkElementFactory(typeof(Grid));
+        
+        var column1 = new FrameworkElementFactory(typeof(ColumnDefinition));
+        column1.SetValue(ColumnDefinition.WidthProperty, new GridLength(1.0, GridUnitType.Star));
+
+        var column2 = new FrameworkElementFactory(typeof(ColumnDefinition));
+        column2.SetValue(ColumnDefinition.WidthProperty, GridLength.Auto);
+
+        var row1 = new FrameworkElementFactory(typeof(RowDefinition));
+        row1.SetValue(RowDefinition.HeightProperty, new GridLength(20.0));
+
+        var row2 = new FrameworkElementFactory(typeof(RowDefinition));
+        row2.SetValue(RowDefinition.HeightProperty, GridLength.Auto);
+
+        var path = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path), "SortIndicator");
+        path.SetValue(System.Windows.Shapes.Path.DataProperty, Theme.AscendIcon);
+        path.SetValue(System.Windows.Shapes.Path.FillProperty, Theme.ForegroundBrush);
+        path.SetValue(System.Windows.Shapes.Path.StrokeProperty, Theme.ForegroundBrush);
+        path.SetValue(System.Windows.Shapes.Path.VerticalAlignmentProperty, VerticalAlignment.Center);
+        path.SetValue(System.Windows.Shapes.Path.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+        path.SetValue(System.Windows.Shapes.Path.MarginProperty, new Thickness{Left = 75.0});
+        path.SetValue(System.Windows.Shapes.Path.VisibilityProperty, Visibility.Collapsed);
+        path.SetValue(Grid.RowProperty, 0);
+        path.SetValue(Grid.ColumnSpanProperty, 1);
+
+        grid.AppendChild(row1);
+        grid.AppendChild(row2);
+        grid.AppendChild(column1);
+        grid.AppendChild(column2);
+        grid.AppendChild(contentBorder);
+        grid.AppendChild(thumbLeft);
+        grid.AppendChild(path);
+
+        var border = new FrameworkElementFactory(typeof(Border), "BackgroundBorder");
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        border.AppendChild(grid);
+
+        var template = new ControlTemplate(typeof(DataGridColumnHeader)){
+            VisualTree = border,
+        };
+        var trigger = new Trigger{
+            Property = DataGridColumnHeader.DisplayIndexProperty,
+            Value = -1,
+        };
+        trigger.Setters.Add(new Setter(DataGridColumnHeader.VisibilityProperty, Visibility.Collapsed, "PART_LeftHeaderGripper"));
+        template.Triggers.Add(trigger);
+
+        var descendingTrigger = new Trigger{
+            Property = DataGridColumnHeader.SortDirectionProperty,
+            Value = ListSortDirection.Descending,
+        };
+        descendingTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.VisibilityProperty, Visibility.Visible, "SortIndicator"));
+        descendingTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.DataProperty, Theme.DescendIcon, "SortIndicator"));
+        template.Triggers.Add(descendingTrigger);
+
+        var ascendingTrigger = new Trigger{
+            Property = DataGridColumnHeader.SortDirectionProperty,
+            Value = ListSortDirection.Ascending,
+        };
+        ascendingTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.VisibilityProperty, Visibility.Visible, "SortIndicator"));
+        ascendingTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.DataProperty, Theme.AscendIcon, "SortIndicator"));
+        template.Triggers.Add(ascendingTrigger);
+
+        var mouseOverTrigger = new Trigger{
+            Property = DataGridColumnHeader.IsMouseOverProperty,
+            Value = true,
+        };
+        mouseOverTrigger.Setters.Add(new Setter(Control.ForegroundProperty, Theme.DataGridHeaderMouseOverBrush, "ContentPresenter"));
+        mouseOverTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.FillProperty, Theme.DataGridHeaderMouseOverBrush, "SortIndicator"));
+        mouseOverTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.StrokeProperty, Theme.DataGridHeaderMouseOverBrush, "SortIndicator"));
+        template.Triggers.Add(mouseOverTrigger);
+
+        return template;
     }
 
     private static Style CreateCellStyle()
@@ -1858,6 +1965,9 @@ public class Theme
     public static Color GrayBorderColor = new Color{A =255, R =75, G = 75, B = 75};
     public static Brush GrayBorderBrush = new SolidColorBrush(GrayBorderColor);
 
+    public static Color DataGridHeaderMouseOverColor = new Color{A = 255, R = 50, G = 170, B = 230};
+    public static Brush DataGridHeaderMouseOverBrush = new SolidColorBrush(DataGridHeaderMouseOverColor);
+
     public static Color TextBoxBackgroundColor = new Color{A =255, R = 30, G = 30, B = 30};
     public static Brush TextBoxBackgroundBrush = new SolidColorBrush(TextBoxBackgroundColor);
 
@@ -1916,6 +2026,9 @@ public class Theme
     public static FontFamily textFontFamily = new FontFamily("Meiryo");
 
     public static Geometry Line = Geometry.Parse("M 0,2 L 0,15 L 1,15 L 1,2 Z");
+
+    public static Geometry AscendIcon = Geometry.Parse("M 0,4 L 0,5 L 5,1 L 10,5 L 10,4 L 5,0 Z");
+    public static Geometry DescendIcon = Geometry.Parse("M 0,4 L 0,5 L 5,10 L 10,5 L 10,4 L 5,9 Z");
 
     public static BitmapSource DirectoryIcon;
     public static BitmapSource SystemDriveIcon;
