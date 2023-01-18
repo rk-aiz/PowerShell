@@ -951,7 +951,10 @@ public class FilerPanel : DataGrid
         this.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
         this.VerticalScrollBarVisibility = ScrollBarVisibility.Visible;
         VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
-        this.ItemsSource = Data.FileInfoCollection;
+        var sourceBinding = new Binding{
+            Source = Data.FileInfoCollectionView,
+        };
+        this.SetBinding(FilerPanel.ItemsSourceProperty, sourceBinding);
         this.ItemContainerStyle = CreateItemContainerStyle();
         this.CellStyle = CreateCellStyle();
         this.ColumnHeaderStyle = CreateColumnHeaderStyle();
@@ -1561,7 +1564,7 @@ public static class Data
             Source = FileInfoCollection,
             IsLiveSortingRequested = true,
         };
-        FileInfoCollectionView.SortDescriptions.Add(new SortDescription(AppSettings.DefaultSortProperty, AppSettings.DefaultSortDirection));
+        //FileInfoCollectionView.SortDescriptions.Add(new SortDescription(AppSettings.DefaultSortProperty, AppSettings.DefaultSortDirection));
         BindingOperations.EnableCollectionSynchronization(FileInfoCollection, _lockObject);
 
         StatusContent = new Dictionary<string, StatusContentEntry>()
