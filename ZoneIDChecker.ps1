@@ -64,6 +64,7 @@ using System.Threading;
 using System.Collections.Specialized;
 using System.Dynamic;
 using System.Threading.Tasks;
+using System.Linq;
 
 #region MainWindow
 public class MainWindow : Window
@@ -938,6 +939,38 @@ class TileButton : ButtonBase, INotifyPropertyChanged
 #region FilerPanel
 public class FilerPanel : DataGrid
 {
+
+    private DataGridColumn _nameColumnn = new DataGridTemplateColumn{
+        Header = "Name",
+        CellTemplate = CreateNameCellTemplate(),
+        Width = new DataGridLength(1.0, DataGridLengthUnitType.Star),
+        MinWidth = 50.0,
+        IsReadOnly = true,
+        CanUserSort = true,
+        SortMemberPath = "Name"
+    };
+
+    private DataGridColumn _hasZoneIdColumn = new DataGridTemplateColumn{
+        Header = "Zone.Identifier",
+        CellTemplate = CreateZoneIdCellTemplate(),
+        Width = new DataGridLength(150.0),
+        MinWidth = 50.0,
+        IsReadOnly = true,
+        CanUserSort = true,
+        SortMemberPath = "HasZoneId"
+    };
+
+    private DataGridColumn _lastWriteTimeColumn = new DataGridTextColumn{
+        Header = "LastWriteTime",
+        Binding = new Binding("LastWriteTimeString"),
+        Width = new DataGridLength(200.0),
+        MinWidth = 50.0,
+        ElementStyle = CreateTextBlockStyle(),
+        IsReadOnly = true,
+        CanUserSort = true,
+        SortMemberPath = "LastWriteTime"
+    };
+
     public FilerPanel()
     {
         this.Margin = new Thickness{Left = 5.0, Top = 15.0};
@@ -961,43 +994,23 @@ public class FilerPanel : DataGrid
         this.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
         this.HorizontalGridLinesBrush = Theme.GrayBorderBrush;
 
-        this.Columns.Add(new DataGridTemplateColumn{
-            Header = "Name",
-            CellTemplate = CreateNameCellTemplate(),
-            Width = new DataGridLength(1.0, DataGridLengthUnitType.Star),
-            MinWidth = 50.0,
-            IsReadOnly = true,
-            CanUserSort = true,
-            SortMemberPath = "Name"
-        });
+        this.Columns.Add(this._nameColumnn);
+        this.Columns.Add(this._hasZoneIdColumn);
+        this.Columns.Add(this._lastWriteTimeColumn);
 
-        this.Columns.Add(new DataGridTemplateColumn{
-            Header = "Zone.Identifier",
-            CellTemplate = CreateZoneIdCellTemplate(),
-            Width = new DataGridLength(150.0),
-            MinWidth = 50.0,
-            IsReadOnly = true,
-            CanUserSort = true,
-            SortMemberPath = "HasZoneId"
-        });
+        //this.Columns[2].SortDirection = ListSortDirection.Descending;
+        //SortManager.FilerPanel = this;
 
-        this.Columns.Add(new DataGridTextColumn{
-            Header = "LastWriteTime",
-            Binding = new Binding("LastWriteTimeString"),
-            Width = new DataGridLength(200.0),
-            MinWidth = 50.0,
-            ElementStyle = CreateTextBlockStyle(),
-            IsReadOnly = true,
-            CanUserSort = true
-        });
-
-        /*this.Columns.Add(new DataGridTextColumn{
-            //Width = new DataGridLength(50.0),
-            ElementStyle = CreateTextBlockStyle(),
-            IsReadOnly = true,
-        });*/
-        this.Columns[2].SortDirection = ListSortDirection.Descending;
         this.AddHandler(DataGridRow.PreviewMouseDoubleClickEvent, new MouseButtonEventHandler(DataGridRow_DoubleClick));
+
+        this.Sorting += (sender, e) => {
+            SortManager.lastSortedColumn = e.Column;
+        };
+    }
+
+    protected override void OnRender(DrawingContext dc)
+    {
+        OnSorting(new DataGridSortingEventArgs(this.Columns[2]));
     }
 
     private void DataGridRow_DoubleClick(object sender, MouseButtonEventArgs e)
@@ -1543,6 +1556,71 @@ public class StatusContentEntry : INotifyPropertyChanged
     }
 }
 
+#region SortManager
+public static class SortManager
+{
+    public static DataGridColumn lastSortedColumn;
+    public static string lastSortMemberPath;
+    public static Nullable<ListSortDirection> lastSortDirection;
+
+    static SortManager()
+    {
+        lastSortMemberPath = AppSettings.DefaultSortProperty;
+        lastSortDirection = AppSettings.DefaultSortDirection;
+    }
+
+    public static void TestSortDescription()
+    {
+        if (null == lastSortedColumn)
+            return;
+        
+        Data.FileInfoCollectionView.SortDescriptions.Clear();
+        
+        try {
+            if (null != lastSortedColumn.SortDirection)
+            {
+                //Console.WriteLine(String.Format("SortDescription : {0} : {1}", lastSortedColumn.SortMemberPath, (ListSortDirection)lastSortedColumn.SortDirection));
+                lastSortMemberPath = lastSortedColumn.SortMemberPath;
+                lastSortDirection = lastSortedColumn.SortDirection;
+                Data.FileInfoCollectionView.SortDescriptions.Add(new SortDescription(lastSortedColumn.SortMemberPath, (ListSortDirection)lastSortedColumn.SortDirection));
+                lastSortedColumn = null;
+            }
+        } catch { }
+    }
+
+    public static IEnumerable<FileSystemInfo> EnumerateSortedFileSystemInfos(DirectoryInfo di)
+    {
+        try
+        {
+            if (ListSortDirection.Ascending == lastSortDirection)
+            {
+                if ("Name" == lastSortMemberPath)
+                    return di.EnumerateFileSystemInfos().OrderBy<FileSystemInfo, String>(FileSystemInfo => FileSystemInfo.Name);
+                else if ("LastWriteTime" == lastSortMemberPath)
+                    return di.EnumerateFileSystemInfos().OrderBy<FileSystemInfo, DateTime>(FileSystemInfo => FileSystemInfo.LastWriteTime);
+                else
+                    return di.EnumerateFileSystemInfos().OrderBy<FileSystemInfo, FileAttributes>(FileSystemInfo => FileSystemInfo.Attributes);
+            }
+            else if (ListSortDirection.Descending == lastSortDirection)
+            {
+                if ("Name" == lastSortMemberPath)
+                    return di.EnumerateFileSystemInfos().OrderByDescending<FileSystemInfo, String>(FileSystemInfo => FileSystemInfo.Name);
+                else if ("LastWriteTime" == lastSortMemberPath)
+                    return di.EnumerateFileSystemInfos().OrderByDescending<FileSystemInfo, DateTime>(FileSystemInfo => FileSystemInfo.LastWriteTime);
+                else
+                    return di.EnumerateFileSystemInfos().OrderByDescending<FileSystemInfo, FileAttributes>(FileSystemInfo => FileSystemInfo.Attributes);
+            }
+            else
+                return di.EnumerateFileSystemInfos();
+        }
+        catch
+        {
+            return di.EnumerateFileSystemInfos();
+        }
+    }
+}
+#endregion SortManager
+
 #region Data
 public static class Data
 {
@@ -1564,7 +1642,7 @@ public static class Data
             Source = FileInfoCollection,
             IsLiveSortingRequested = true,
         };
-        //FileInfoCollectionView.SortDescriptions.Add(new SortDescription(AppSettings.DefaultSortProperty, AppSettings.DefaultSortDirection));
+        FileInfoCollectionView.SortDescriptions.Add(new SortDescription(AppSettings.DefaultSortProperty, AppSettings.DefaultSortDirection));
         BindingOperations.EnableCollectionSynchronization(FileInfoCollection, _lockObject);
 
         StatusContent = new Dictionary<string, StatusContentEntry>()
@@ -1690,6 +1768,8 @@ public static class Data
             IconsDictionary.Clear();
         }
 
+        SortManager.TestSortDescription();
+
         lock (_lockObject)
         {
             FileInfoCollection.Clear();
@@ -1724,7 +1804,7 @@ public static class Data
     {
         lock (_lockObject)
         {
-            foreach (var info in CurrentDirectory.EnumerateFileSystemInfos())
+            foreach (var info in SortManager.EnumerateSortedFileSystemInfos(CurrentDirectory))
             {
                 if (token.IsCancellationRequested)
                 {
@@ -2194,7 +2274,7 @@ static public class AppSettings
     }
 }
 #endregion AppSettings
-'@ -ReferencedAssemblies Microsoft.CSharp, WindowsBase, System.Threading, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
+'@ -ReferencedAssemblies Microsoft.CSharp, WindowsBase, System.Linq, System.Threading, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
 }
 
 if ($UserDebug) {
