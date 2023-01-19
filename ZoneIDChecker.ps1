@@ -1380,11 +1380,36 @@ class CustomResourceDictionary : ResourceDictionary
 
         var border = new FrameworkElementFactory(typeof(Border));
         border.SetValue(Border.BackgroundProperty, Theme.ScrollBarBackgroundBrush);
+        border.SetValue(Grid.RowProperty, 1);
         border.AppendChild(track);
+
+        var pageUpButton = new FrameworkElementFactory(typeof(CustomRepeatButton));
+        pageUpButton.SetValue(RepeatButton.ContentProperty, Theme.LineUpIcon);
+        pageUpButton.SetValue(RepeatButton.CommandProperty, ScrollBar.LineUpCommand);
+        pageUpButton.SetValue(Grid.RowProperty, 0);
+
+        var pageDownButton = new FrameworkElementFactory(typeof(CustomRepeatButton));
+        pageDownButton.SetValue(RepeatButton.ContentProperty, Theme.LineDownIcon);
+        pageDownButton.SetValue(RepeatButton.CommandProperty, ScrollBar.LineDownCommand);
+        pageDownButton.SetValue(Grid.RowProperty, 2);
+
+        var row1 = new FrameworkElementFactory(typeof(RowDefinition));
+        row1.SetValue(RowDefinition.HeightProperty, GridLength.Auto);
+
+        var row2 = new FrameworkElementFactory(typeof(RowDefinition));
+        row2.SetValue(RowDefinition.HeightProperty, new GridLength(1.0, GridUnitType.Star));
+
+        var row3 = new FrameworkElementFactory(typeof(RowDefinition));
+        row3.SetValue(RowDefinition.HeightProperty, GridLength.Auto);
 
         var grid = new FrameworkElementFactory(typeof(Grid), "Bg");
         grid.SetValue(Grid.SnapsToDevicePixelsProperty, true);
+        grid.AppendChild(row1);
+        grid.AppendChild(row2);
+        grid.AppendChild(row3);
+        grid.AppendChild(pageUpButton);
         grid.AppendChild(border);
+        grid.AppendChild(pageDownButton);
 
         var ct = new ControlTemplate(typeof(ScrollBar)){
             VisualTree = grid,
@@ -1408,6 +1433,62 @@ class CustomResourceDictionary : ResourceDictionary
     }
 }
 #endregion CustomResourceDictionary
+
+#region CustomRepeatButton
+class CustomRepeatButton : RepeatButton
+{
+    private Storyboard MouseEnterAnimationStoryboard = new Storyboard();
+    private Storyboard MouseLeaveAnimationStoryboard = new Storyboard();
+    private SolidColorBrush BackgroundBrush = new SolidColorBrush(Colors.Gray);
+
+    public CustomRepeatButton()
+    {
+        this.Template = CreateTemplate();
+        this.Margin = new Thickness{Right = 0.5};
+
+        NameScope.SetNameScope(this, new NameScope());
+        this.RegisterName("ScrollThumbBackgroundColor", this.BackgroundBrush);
+
+        this.MouseEnterAnimationStoryboard.Children.Add(Theme.ScrollThumbMouseEnterColorAnimation);
+        this.MouseLeaveAnimationStoryboard.Children.Add(Theme.ScrollThumbMouseLeaveColorAnimation);
+
+        this.MouseEnter += (sender, e) => {
+            this.MouseEnterAnimationStoryboard.Begin(this);
+        };
+        this.MouseLeave += (sender, e) => {
+            this.MouseLeaveAnimationStoryboard.Begin(this);
+        };
+    }
+
+    private ControlTemplate CreateTemplate()
+    {
+        var path = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path));
+        var geometryBinding = new Binding("Content"){
+            Source = this
+        };
+        path.SetBinding(System.Windows.Shapes.Path.DataProperty, geometryBinding);
+        var bindingBackground = new Binding{
+            BindsDirectlyToSource = true,
+            Source = this.BackgroundBrush,
+        };
+        path.SetBinding(System.Windows.Shapes.Path.FillProperty, bindingBackground);
+        path.SetBinding(System.Windows.Shapes.Path.StrokeProperty, bindingBackground);
+        path.SetValue(System.Windows.Shapes.Path.VerticalAlignmentProperty, VerticalAlignment.Center);
+        path.SetValue(System.Windows.Shapes.Path.HorizontalAlignmentProperty, HorizontalAlignment.Left);
+        
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.HeightProperty, 18.0);
+        border.SetValue(Border.WidthProperty, 15.0);
+        border.SetValue(Border.BackgroundProperty, Theme.ScrollBarBackgroundBrush);
+        border.AppendChild(path);
+
+        var ct = new ControlTemplate(typeof(CustomRepeatButton)){
+            VisualTree = border
+        };
+        return ct;
+    }
+}
+#endregion CustomRepeatButton
 
 #region CustomTrack
 class CustomTrack : Track, INotifyPropertyChanged
@@ -2112,6 +2193,9 @@ public class Theme
 
     public static Geometry AscendIcon = Geometry.Parse("M 0,4 L 0,5 L 5,1 L 10,5 L 10,4 L 5,0 Z");
     public static Geometry DescendIcon = Geometry.Parse("M 0,4 L 0,5 L 5,10 L 10,5 L 10,4 L 5,9 Z");
+
+    public static Geometry LineUpIcon = Geometry.Parse("M 0,4 L 0,6 L 5,2 L 10,6 L 10,4 L 5,0 Z");
+    public static Geometry LineDownIcon = Geometry.Parse("M 0,0 L 0,2 L 5,6 L 10,2 L 10,0 L 5,4 Z");
 
     public static BitmapSource DirectoryIcon;
     public static BitmapSource SystemDriveIcon;
