@@ -40,6 +40,7 @@ Try {
 Add-Type -TypeDefinition @'
 using System;
 using System.IO;
+using System.Text;
 using System.Drawing;
 using System.Windows;
 using System.Windows.Shapes;
@@ -993,6 +994,9 @@ public class FilerPanel : DataGrid
         this.ColumnHeaderStyle = CreateColumnHeaderStyle();
         this.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
         this.HorizontalGridLinesBrush = Theme.GrayBorderBrush;
+        this.ContextMenu = new CustomContextMenu();
+        //ContextMenuService.SetPlacement(this, PlacementMode.Mouse);
+        //ContextMenuService.SetHorizontalOffset(this, 200.0);
 
         this.Columns.Add(this._nameColumnn);
         this.Columns.Add(this._hasZoneIdColumn);
@@ -1019,9 +1023,16 @@ public class FilerPanel : DataGrid
         {
             try {
                 var path = ((FileSystemInfoEntry)((FrameworkElement)e.OriginalSource).DataContext).Path;
-                if (null != path && Directory.Exists(path))
+                if (null == path)
+                    return;
+                
+                if (Directory.Exists(path))
                 {
                     Data.CurrentDirectory =  new DirectoryInfo(path);
+                }
+                else if (File.Exists(path))
+                {
+                    Process.Start(new ProcessStartInfo(path));
                 }
             } catch { }
         }
@@ -1218,6 +1229,97 @@ public class FilerPanel : DataGrid
     }
 }
 #endregion FilerPanel
+
+#region CustomContextMenu
+class CustomContextMenu : ContextMenu
+{
+    public CustomContextMenu()
+    {
+        this.Background = Theme.BackgroundBrush;
+        this.Foreground = Theme.ForegroundBrush;
+        this.Template = CreateTemplate();
+
+        var menu1 = new MenuItem{
+            Header = "Open with Explorer",
+            Template = CreateItemTemplate(),
+        };
+        menu1.Click += new RoutedEventHandler(MenuItem1_Click);
+
+        var menu2 = new MenuItem{
+            Header = "Properties",
+            Template = CreateItemTemplate(),
+        };
+        menu2.Click += new RoutedEventHandler(MenuItem2_Click);
+
+        this.AddChild(menu1);
+        this.AddChild(menu2);
+    }
+
+    private ControlTemplate CreateTemplate()
+    {
+        var stack = new FrameworkElementFactory(typeof(StackPanel));
+        stack.SetValue(StackPanel.IsItemsHostProperty, true);
+        stack.SetValue(StackPanel.MarginProperty, new Thickness{Top = 5, Bottom = 5});
+
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BorderThicknessProperty, new Thickness(1.0));
+        border.SetValue(Border.BorderBrushProperty, Theme.GrayBrush);
+        border.SetValue(Border.BackgroundProperty, Theme.BackgroundBrush);
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5.0));
+        border.AppendChild(stack);
+
+        var template = new ControlTemplate{
+            VisualTree = border,
+        };
+        return template;
+    }
+
+    private ControlTemplate CreateItemTemplate()
+    {
+        var text = new FrameworkElementFactory(typeof(TextBlock), "textblock");
+        text.SetValue(TextBlock.TextProperty, new Binding("Header"){RelativeSource = RelativeSource.TemplatedParent});
+        text.SetValue(TextBlock.PaddingProperty, new Thickness{Left = 10.0, Right = 10.0, Top = 2.0, Bottom = 2.0});
+        text.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+        text.SetValue(TextBlock.FontSizeProperty, 17.0);
+
+        var mouseOverTrigger = new Trigger{
+            Property = MenuItem.IsMouseOverProperty,
+            Value = true,
+        };
+        mouseOverTrigger.Setters.Add(new Setter(TextBlock.BackgroundProperty, Theme.ButtonMouseOverBackgroundBrush, "textblock"));
+
+        var template = new ControlTemplate{
+            VisualTree = text
+        };
+        template.Triggers.Add(mouseOverTrigger);
+        
+        return template;
+    }
+
+    private void MenuItem1_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            var item = ((DataGrid)((ContextMenu)((MenuItem)sender).Parent).PlacementTarget).SelectedItem;
+            var path = ((FileSystemInfoEntry)item).Path;
+            if (Directory.Exists(path))
+                Process.Start("explorer.exe", String.Format(" \"{0}\"", path));
+            else
+                Process.Start("explorer.exe", String.Format("/select,\"{0}\"", path));
+        } catch { }
+    }
+
+    private void MenuItem2_Click(object sender, RoutedEventArgs e)
+    {
+        try {
+            var items = ((DataGrid)((ContextMenu)((MenuItem)sender).Parent).PlacementTarget).SelectedItems;
+            foreach (FileSystemInfoEntry f in items) {
+                Win32.FileSystemProperties(f.Path);
+            }
+        } catch { }
+    }
+
+}
+#endregion ContextMenu
 
 #region CustomStatusBar
 public class CustomStatusBar : StatusBar
@@ -1936,6 +2038,7 @@ public static class Win32
     private static readonly int SIZE_SHFILEINFO = Marshal.SizeOf(typeof(SHFILEINFO));
     public const string Shell32 = "shell32.dll";
     public const string ImageRes = "ImageRes.dll";
+    private const uint SHOP_FILEPATH = 0x2;
 
     [DllImport("ntdll.dll", CharSet=CharSet.Auto)]
     private static extern IntPtr NtQueryInformationFile(SafeFileHandle fileHandle, out IO_STATUS_BLOCK IoStatusBlock, IntPtr pInfoBlock, int length, FILE_INFORMATION_CLASS fileInformation);  
@@ -1948,6 +2051,17 @@ public static class Win32
     
     [DllImport("user32.dll", EntryPoint="DestroyIcon")]
     private static extern int DestroyIcon(IntPtr hIcon);
+
+    [DllImport("shell32.dll")]
+    private static extern bool SHObjectProperties(IntPtr hwnd,
+                                    uint shopObjectType,
+                                    [MarshalAs(UnmanagedType.LPWStr)] string pszObjectName,
+                                    [MarshalAs(UnmanagedType.LPWStr)] string pszPropertyPage);
+
+    public static void FileSystemProperties(string path)
+    {
+        SHObjectProperties(IntPtr.Zero, SHOP_FILEPATH, path, String.Empty);
+    }
 
     private struct IO_STATUS_BLOCK {
         internal uint status;
