@@ -17,24 +17,13 @@ Param(
     [switch] $UserDebug
 )
 
-if ($ShowConsole -eq $false)
-{
-    #自身のps1をウィンドウ無しで再実行する
-    $strAlwaysOnTop = $(if ($AlwaysOnTop) {'-AlwaysOnTop '} else {''})
-    $StartInfo = New-Object Diagnostics.ProcessStartInfo
-    $StartInfo.UseShellExecute = $false
-    $StartInfo.CreateNoWindow = $true
-    $StartInfo.FileName = "powershell.exe"
-    $StartInfo.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Unrestricted -File "{0}" -ShowConsole {1}' -f $MyInvocation.MyCommand.Path, $strAlwaysOnTop
-    $Process = New-Object Diagnostics.Process
-    $Process.StartInfo = $StartInfo
-    $null = $Process.Start()
-    return
-}
-
 #============================================================================ #
 # C# Section
+
+$CS_ASSEMBLY = "ZoneIdChecker_gui.dll"
+
 Try {
+    [void][Reflection.Assembly]::LoadFile((Resolve-Path $CS_ASSEMBLY -ErrorAction SilentlyContinue))
     [void][MainWindow]
 } Catch {
 Add-Type -TypeDefinition @'
@@ -70,15 +59,15 @@ using System.Linq;
 #region MainWindow
 public class MainWindow : Window
 {
-    public MainWindow()
+    public MainWindow(string title)
     {
-        InitializeComponent();
+        InitializeComponent(title);
         Data.OnCurrentDirectoryChanged();
     }
 
-    private void InitializeComponent()
+    private void InitializeComponent(string title)
     {
-        this.Title = "Zone.Identifier Checker";
+        this.Title = title;
         this.Width = 960.0;
         this.Height = 720.0;
         this.ShowActivated = true;
@@ -2052,6 +2041,12 @@ public static class Win32
     [DllImport("user32.dll", EntryPoint="DestroyIcon")]
     private static extern int DestroyIcon(IntPtr hIcon);
 
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetForegroundWindow(IntPtr hWnd);
+
     [DllImport("shell32.dll")]
     private static extern bool SHObjectProperties(IntPtr hwnd,
                                     uint shopObjectType,
@@ -2472,7 +2467,33 @@ static public class AppSettings
     }
 }
 #endregion AppSettings
-'@ -ReferencedAssemblies Microsoft.CSharp, WindowsBase, System.Linq, System.Threading, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop
+'@ -OutputAssembly $CS_ASSEMBLY -ReferencedAssemblies Microsoft.CSharp, WindowsBase, System.Linq, System.Threading, System.Xaml, PresentationFramework, PresentationCore, System.Configuration -ErrorAction Stop -PassThru
+}
+
+function ActivateWindow {
+    param([string]$windowTitle)
+
+    $targetProcess = (Get-Process | Where-Object { $_.MainWindowTitle -eq $windowTitle })
+    $hwnd = $targetProcess.MainWindowHandle
+
+    if (($hwnd -ne $null) -and ($hwnd -ne [System.IntPtr]::Zero)) {
+        [Win32]::SetForegroundWindow($hwnd)
+    } else {
+        Write-Host "Failed to activate window."
+    }
+}
+
+function ShowWindow {
+    param([string]$windowTitle, [int]$mode)
+
+    $targetProcess = (Get-Process | Where-Object { $_.MainWindowTitle -eq $windowTitle })
+    $hwnd = $targetProcess.MainWindowHandle
+
+    if (($hwnd -ne $null) -and ($hwnd -ne [System.IntPtr]::Zero)) {
+        [Win32]::ShowWindowAsync($hwnd, $mode)
+    } else {
+        Write-Host "Failed to hide the console window."
+    }
 }
 
 if ($UserDebug) {
@@ -2483,8 +2504,18 @@ if ($UserDebug) {
 # PowerShell Section
 function Program
 {
-    $MainWindow = New-Object MainWindow
+    param([string]$title, [bool]$showConsole = $false)
+
+    $MainWindow = New-Object MainWindow($title)
     #$MainWindow.SetCurrentDirectory([AppSettings]::DownloadFolder)
+    if ($showConsole -eq $false) {
+        $MainWindow.add_Loaded({
+            param($sender, $e)
+            $UniqueWindowTitle = New-Guid
+            $Host.UI.RawUI.WindowTitle = $UniqueWindowTitle
+            ShowWindow $UniqueWindowTitle 0
+        })
+    }
 
     [Data]::add_RequestRemoveZoneId({
         Param($s, $e)
@@ -2519,10 +2550,14 @@ function Program
 }
 
 $mutexObj = New-Object Threading.Mutex($false, ('Global\{0}' -f $MyInvocation.MyCommand.Name))
+$title = "Zone.Identifier Checker"
 
 if ($mutexObj.WaitOne(0, $false)) {
-    Program
+    Program $title $ShowConsole
     $mutexObj.ReleaseMutex()
+} else {
+    ShowWindow $title 1
+    ActivateWindow $title
 }
 
 $mutexObj.Close()
