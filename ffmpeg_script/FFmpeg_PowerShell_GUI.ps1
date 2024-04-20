@@ -33,6 +33,9 @@ $AUTO_PLAY_ENCODED = $false
 $OPEN_FOLDER_ENCODED = $false
 $SHOW_CONSOLE_PROGRESSBAR = $false
 
+$FFMPEG_FILE = "ffmpeg.exe"
+$FFPROBE_FILE = "ffprobe.exe"
+
 $OpenFileScript = {
     param([string]$filePath)
     if ((Test-Path -LiteralPath $filePath)) {
@@ -195,16 +198,17 @@ Try {
 ######     From here, use [ConsoleHelper] instead of [Write-Host].     ######
 
 # check ffmpeg.exe
+[ConsoleHelper]::WriteLine("######    FFmpeg version    ######", 1, 1)
 try {
-    ffmpeg.exe -version | Out-Null
+    Start-Process $FFMPEG_FILE ('-version') -Wait -NoNewWindow
 } catch {
-    [ConsoleHelper]::Error("Error : ffmpeg.exe was not found.", 1, 2)
+    [ConsoleHelper]::Error("Error : ffmpeg.exe was not found.", 1, 5)
     exit 2
 }
 
 # check ffmpeg parameters
-[ConsoleHelper]::WriteLine("Encode parameters", 1)
-[ConsoleHelper]::WriteLine(((GetFFmpegParams '[input]' '[output]') -join "`r`n"), 1, 2)
+[ConsoleHelper]::WriteLine("######    Encode parameters    ######", 1)
+[ConsoleHelper]::WriteLine(((GetFFmpegParams '[input]' '[output]') -join "`r`n"), 1, 1)
 
 # check [$Error]
 if ($Error.Count -gt 0) {
@@ -245,7 +249,7 @@ if ([String]::IsNullOrEmpty($global:output)) {
 
 
 $ffmpegParams = GetFFmpegParams $global:path $global:output
-$ffmpegProcess = New-Object HelperClasses.ProcessInfo("ffmpeg.exe", ($ffmpegParams -join ' '))
+$ffmpegProcess = New-Object HelperClasses.ProcessInfo($FFMPEG_FILE, ($ffmpegParams -join ' '))
 
 $ffprobeParams = @(
     '-v error',
@@ -255,7 +259,7 @@ $ffprobeParams = @(
     '-of default=nw=1',
     ('"{0}"' -f $global:path)
 )
-$ffprobeProcess = New-Object HelperClasses.ProcessInfo("ffprobe.exe", ($ffprobeParams -join ' '))
+$ffprobeProcess = New-Object HelperClasses.ProcessInfo($FFPROBE_FILE, ($ffprobeParams -join ' '))
 $ffprobeTask = $ffprobeProcess.Start()
 
 $syncData = [HashTable]::Synchronized(@{
@@ -342,6 +346,12 @@ $openFolderCommand.ExecuteHandler = {
     $OpenExplorerScript.Invoke($syncData.output)
 }
 $viewModel.OpenFolderCommand = $openFolderCommand
+
+$openFileCommand = New-Object ProgressWindow.DelegateCommand
+$openFileCommand.ExecuteHandler = {
+    $OpenFileScript.Invoke($syncData.output)
+}
+$viewModel.OpenFileCommand = $openFileCommand
 
 # ------------------------------------
 # Runspace execution
@@ -452,7 +462,8 @@ $runspaceScript = {
                                 # and [ProgressRecord.RecordType]
                                 $progressRecord.RecordType = [System.Management.Automation.ProgressRecordType]::Completed
                                 $PSHost.UI.WriteProgress($progressRecord.ActivityId, $progressRecord)
-                        }}
+                            }
+                        }
 
                     } elseif ($data.Contains("Duration:")) {
 
@@ -502,6 +513,12 @@ $runspaceScript = {
     $ffmpegProcess.Dispose()
 
     if (($syncData.exitCode -eq 0) -and ($syncData.termination -eq $false)) {
+        
+        # --- たまに99.9%でプロセスが終了してしまうようなので対策コード ※要調査
+        $viewModel.Progress = 100.0
+        $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Completed
+        # -----------------------------------------------------------------
+        
         if ($viewModel.AutoPlay) {
             $syncData.openfile.Invoke($syncData.output)
         }
@@ -531,7 +548,6 @@ try{
     $Error
     exit 1
 }
-
 
 $Runspace = [RunSpaceFactory]::CreateRunspace()
 $Runspace.ApartmentState = "STA"

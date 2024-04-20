@@ -33,7 +33,7 @@ namespace ProgressWindow
 {
     internal class Theme
     {
-        internal static Color backgroundColor = new Color { A = 255, R = 55, G = 55, B = 55 };
+        internal static Color backgroundColor = new Color { A = 255, R = 50, G = 50, B = 50 };
         internal static Brush backgroundBrush = new SolidColorBrush(backgroundColor);
         internal static Brush foregroundBrush = new SolidColorBrush(Colors.WhiteSmoke);
 
@@ -49,7 +49,7 @@ namespace ProgressWindow
         internal static Brush progressBarStripeBrush = GetFreezedBrush(86, 149, 247);
         internal static Brush toggleOnBrush = GetFreezedBrush(90, 200, 255);
         internal static Brush warningIconBrush = GetFreezedBrush(238, 157, 40);
-        internal static Brush progressBarCompletedBrush = GetFreezedBrush(0, 200, 245);
+        internal static Brush progressBarCompletedBrush = GetFreezedBrush(0, 160, 200);
         internal static Brush switchEllipseBrush = GetFreezedBrush(220, 220, 220);
         internal static Brush switchOnEllipseBrush = GetFreezedBrush(20, 20, 20);
         internal static Brush switchBorderBrush = GetFreezedBrush(150, 150, 150);
@@ -57,12 +57,10 @@ namespace ProgressWindow
         internal static Brush switchMouseOverBackgroundBrush = GetFreezedBrush(70, 70, 70);
         internal static Brush switchOnBackgroundBrush = GetFreezedBrush(0, 120, 220);
         internal static Brush switchOnMouseOverBackgroundBrush = GetFreezedBrush(20, 160, 255);
-
-        internal static Brush snackbarBackgroundBrush = GetFreezedBrush(100, 100, 100, 180);
-
+        internal static Brush snackbarBackgroundBrush = GetFreezedBrush(80, 80, 80, 220);
         internal static Brush spinnerBackgroundBrush = GetFreezedBrush(116, 39, 116);
         internal static Brush spinnerForegroundBrush = GetFreezedBrush(184, 127, 183);
-
+        internal static Brush completedIconBrush = GetFreezedBrush(98, 255, 223);
         internal static Geometry barGeometry = GetGeometry("M 2 0 L 38 0 A 2 2 0 0 1 38 4 L 2 4 A 2 2 0 0 1 2 0 Z");
         internal static Geometry pinGeometry = GetGeometry(
             "M 10.5 1.4 C 10.3 1.4 10.3 1.4 10.2 1.4 C 10.1 1.5 10 1.6 10 1.7 L 8 6 C 7.9 6.2 7.8 6.4 7.7 6.6 C 7.5 6.7 7.3 6.8 7.1 6.9 L 2.7 8.6 L 9.3 15.2 L 10.5 11.1 C 10.6 10.8 10.7 10.6 10.9 10.4 C 11.1 10.2 11.3 10.1 11.5 10 L 16.2 8 C 16.3 7.9 16.5 7.9 16.5 7.8 C 16.6 7.7 16.6 7.6 16.6 7.5 C 16.6 7.3 16.6 7.2 16.4 7.1 L 10.9 1.5 C 10.8 1.4 10.6 1.4 10.5 1.4 Z M 10.5 0.3 C 10.7 0.3 10.9 0.3 11.2 0.4 C 11.3 0.5 11.5 0.6 11.7 0.7 L 17.2 6.3 C 17.4 6.5 17.5 6.7 17.6 6.8 C 17.6 7 17.7 7.3 17.7 7.5 C 17.7 7.8 17.6 8.2 17.5 8.5 C 17.2 8.7 17 8.9 16.6 9.1 L 12 11 C 11.9 11.1 11.8 11.1 11.8 11.2 C 11.7 11.2 11.7 11.3 11.6 11.3 L 10.1 16.5 C 10.1 16.6 10 16.6 9.9 16.7 C 9.8 16.8 9.7 16.9 9.5 16.9 C 9.4 16.9 9.3 16.8 9.2 16.7 L 5.7 13.1 L 0.8 18 L 0 18 L 0 17.2 L 4.9 12.4 L 1.3 8.8 C 1.2 8.7 1.2 8.6 1.2 8.5 C 1.2 8.3 1.2 8.2 1.3 8.1 C 1.3 8 1.4 7.9 1.4 7.9 L 6.7 5.8 C 6.8 5.8 6.9 5.7 8.9 1.3 C 9.1 1 9.3 0.7 9.5 0.5 C 9.8 0.4 10.2 0.3 10.5 0.3 Z"
@@ -115,7 +113,13 @@ namespace ProgressWindow
         internal static Geometry openfolderGeometry = GetGeometry(
             "M 3.06 18.75 A 3.06 3.06 0 0 1 0 15.69 L 0 4.31 A 3.06 3.06 0 0 1 3.06 1.25 L 6.88 1.25 C 7.32 1.25 7.71 1.32 8.03 1.46 C 8.35 1.6 8.65 1.79 8.91 2.02 C 9.17 2.26 9.41 2.52 9.63 2.82 C 9.85 3.12 10.08 3.43 10.31 3.75 L 15.67 3.75 A 3.06 3.06 0 0 1 18.75 6.77 C 19.06 7.01 19.29 7.3 19.46 7.65 C 19.63 7.99 19.72 8.36 19.72 8.75 C 19.72 8.81 19.72 8.87 19.72 8.92 C 19.72 8.98 19.71 9.03 19.7 9.09 L 18.73 16.05 C 18.68 16.43 18.56 16.78 18.38 17.1 C 18.2 17.43 17.97 17.72 17.7 17.96 C 17.42 18.21 17.11 18.4 16.77 18.54 C 16.42 18.68 16.06 18.75 15.68 18.75 Z M 17.39 6.26 C 17.33 6.07 17.24 5.9 17.12 5.75 C 17 5.59 16.87 5.46 16.71 5.35 C 16.55 5.24 16.38 5.15 16.2 5.09 C 16.02 5.03 15.83 5 15.63 5 L 9.69 5 L 8.38 3.25 C 8.2 3.02 7.98 2.83 7.71 2.7 C 7.45 2.57 7.17 2.5 6.88 2.5 L 3.13 2.5 A 1.88 1.88 0 0 0 1.25 4.38 L 1.25 15.63 C 1.25 15.66 1.25 15.7 1.25 15.74 C 1.26 15.77 1.26 15.81 1.26 15.85 L 2.83 8.24 C 2.89 7.96 3 7.69 3.15 7.45 C 3.3 7.2 3.49 6.99 3.71 6.82 C 3.92 6.64 4.17 6.5 4.44 6.4 C 4.71 6.3 4.99 6.25 5.28 6.25 L 17.23 6.25 C 17.26 6.25 17.29 6.25 17.31 6.25 C 17.33 6.25 17.36 6.25 17.39 6.26 Z M 15.63 17.5 C 15.87 17.5 16.09 17.46 16.3 17.38 C 16.52 17.3 16.7 17.18 16.87 17.04 C 17.04 16.89 17.17 16.72 17.28 16.52 C 17.39 16.33 17.46 16.11 17.49 15.88 L 18.46 8.93 C 18.46 8.89 18.47 8.86 18.47 8.84 C 18.47 8.81 18.47 8.78 18.47 8.75 C 18.47 8.58 18.43 8.42 18.37 8.27 C 18.3 8.11 18.22 7.98 18.11 7.87 C 17.99 7.75 17.86 7.66 17.71 7.6 C 17.57 7.53 17.4 7.5 17.23 7.5 L 5.28 7.5 C 5.13 7.5 4.99 7.52 4.86 7.57 C 4.72 7.62 4.6 7.69 4.49 7.78 C 4.38 7.87 4.29 7.97 4.21 8.1 C 4.13 8.22 4.08 8.35 4.05 8.5 L 2.25 17.28 C 2.53 17.43 2.82 17.5 3.13 17.5 Z"
         );
+        internal static Geometry completedGeometry = GetGeometry(
+            "M 0 9.375 A 9.375 9.375 0 0 1 18.75 9.375 A 9.375 9.375 0 0 1 0 9.375 Z M 17.175 9.375 A 7.8 7.8 0 0 0 1.575 9.375 A 7.8 7.8 0 0 0 17.175 9.375 Z M 4.3476 9.9024 A 0.5274 0.5274 90 0 1 5.4024 8.8476 L 7.875 11.3086 L 13.3476 5.8476 A 0.5274 0.5274 90 0 1 14.4024 6.9024 L 8.4024 12.9024 C 8.254 13.0508 8.0782 13.125 7.875 13.125 C 7.6718 13.125 7.496 13.0508 7.3476 12.9024 L 4.3476 9.9024 Z"
+        );
 
+        internal static Geometry playGeometry = GetGeometry(
+            "m 3.5 15.98 l 0 -11.96 a 1.67 1.67 0 0 1 2.57 -1.39 l 9.3 5.96 a 1.67 1.67 0 0 1 0 2.82 l -9.3 5.96 a 1.67 1.67 0 0 1 -2.57 -1.39 z m 1.67 -11.96 l 0 11.96 l 9.29 -5.98 z"
+        );
         static Theme()
         {
         }
@@ -140,6 +144,39 @@ namespace ProgressWindow
     {
         private ViewModel _viewModel;
         private Dispatcher _dp = Dispatcher.CurrentDispatcher;
+        private TaskbarItemInfo _taskbarItemInfo = new TaskbarItemInfo();
+        public double ProgressProxy
+        { 
+            get { return (double)GetValue(ProgressProxyProperty); } 
+            set { SetValue(ProgressProxyProperty, value); } 
+        }
+        public static readonly DependencyProperty ProgressProxyProperty = 
+            DependencyProperty.Register("ProgressProxy", typeof(double),
+                typeof(MainWindow), new PropertyMetadata(0.0, ProgressProxyMethod));
+
+        private static void ProgressProxyMethod(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if ((double)e.OldValue != (double)e.NewValue) {
+                var source = d as MainWindow;
+                source._taskbarItemInfo.ProgressValue = (double)e.NewValue / 100;
+            }
+        }
+
+        public TaskbarItemProgressState ProgressStateProxy
+        { 
+            get { return (TaskbarItemProgressState)GetValue(ProgressStateProxyProperty); } 
+            set { SetValue(ProgressStateProxyProperty, value); } 
+        }
+        public static readonly DependencyProperty ProgressStateProxyProperty = 
+            DependencyProperty.Register("ProgressStateProxy", typeof(TaskbarItemProgressState),
+                typeof(MainWindow), new PropertyMetadata(TaskbarItemProgressState.None, ProgressStateProxyMethod));
+        private static void ProgressStateProxyMethod(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if ((TaskbarItemProgressState)e.OldValue != (TaskbarItemProgressState)e.NewValue) {
+                var source = d as MainWindow;
+                source._taskbarItemInfo.ProgressState = (TaskbarItemProgressState)e.NewValue;
+            }
+        }
 
         public MainWindow(ViewModel viewModel)
         {
@@ -162,6 +199,16 @@ namespace ProgressWindow
             });
             SetBinding(Window.TopmostProperty, new OneWayBinding("WindowTopmost"));
             Loaded += (sender, e) => { viewModel.WindowTopmost = false; };
+
+            SetBinding(
+                ProgressStateProxyProperty,
+                new OneWayBinding("ProgressStatus"){
+                    Converter = TaskbarItemProgressStateConverter.I,
+                    ConverterParameter = ProgressStatus.Completed
+                }
+            );
+            SetBinding(ProgressProxyProperty, new OneWayBinding("Progress"));
+            TaskbarItemInfo = _taskbarItemInfo;
         }
 
         private static Style CreateStyle()
@@ -207,8 +254,17 @@ namespace ProgressWindow
             };
             var footer = new CustomFooter();
 
-            var loadingPanel = new LoadingPanel{ GridRowSpan = 2, VerticalAlignment = VerticalAlignment.Top };
-            loadingPanel.SetBinding(LoadingPanel.RequestVisibleProperty, new OneWayBinding("Busy"));
+            var loadingPanel = new LoadingMessage{ GridRowSpan = 2, VerticalAlignment = VerticalAlignment.Top };
+            loadingPanel.SetBinding(Snackbar.RequestVisibleProperty, new OneWayBinding("Busy"));
+
+            var completePanel = new CompleteMessage{ GridRowSpan = 2, VerticalAlignment = VerticalAlignment.Top };
+            completePanel.SetBinding(
+                Snackbar.RequestVisibleProperty,
+                new OneWayBinding("ProgressStatus"){
+                    Converter = EnumToBooleanConverter.I,
+                    ConverterParameter = ProgressStatus.Completed
+                }
+            );
 
             var tabControl = new CustomTabControl{
                 Header = header
@@ -226,6 +282,7 @@ namespace ProgressWindow
             visualRoot.Children.Add(tabControl);
             visualRoot.Children.Add(footer);
             visualRoot.Children.Add(loadingPanel);
+            visualRoot.Children.Add(completePanel);
 
             Content = visualRoot;
         }
@@ -825,6 +882,8 @@ namespace ProgressWindow
         protected TileButton()
         {
             VerticalAlignment = VerticalAlignment.Center;
+            VerticalContentAlignment = VerticalAlignment.Center;
+            HorizontalContentAlignment = HorizontalAlignment.Center;
             Foreground = Theme.foregroundBrush;
             Background = Brushes.Transparent;
             FontFamily = new FontFamily("Segoe MDL2 Assets");
@@ -837,16 +896,14 @@ namespace ProgressWindow
 
         protected static ControlTemplate CreateTemplate()
         {
-            var contentPresenter = new FrameworkElementFactory(typeof(ContentPresenter), "presenter");
-            contentPresenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-            contentPresenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            var content = new FrameworkElementFactory(typeof(ContentPresenter), "presenter");
+            content.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            content.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
 
             var border = new FrameworkElementFactory(typeof(Border), "border");
             border.SetValue(Control.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
             border.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
-            border.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Stretch);
-            border.SetValue(Border.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
-            border.AppendChild(contentPresenter);
+            border.AppendChild(content);
 
             var ct = new ControlTemplate(typeof(ButtonBase)){
                 VisualTree = border,
@@ -908,7 +965,7 @@ namespace ProgressWindow
 
         private Style CreateStyle()
         {
-            var baseTemplate = TileButton.CreateTemplate();
+            var baseTemplate = CreateTemplate();
 
             var trigger = new Trigger{
                 Property = CustomToggleButton.IsCheckedProperty,
@@ -1179,33 +1236,42 @@ namespace ProgressWindow
         }
     }
 
-    public class LoadingPanel : UserControl
+    public class Snackbar : HeaderedContentControl
     {
+        public int GridRow
+        { set { Grid.SetRow(this, value); } }
+
+        public int GridColumn
+        { set { Grid.SetColumn(this, value); } }
+
+        public int GridRowSpan
+        { set { Grid.SetRowSpan(this, value); } }
+
+        public int GridColumnSpan
+        { set { Grid.SetColumnSpan(this, value); } }
 
         public bool RequestVisible
         {
             get { return (bool)GetValue(RequestVisibleProperty); }
             set { SetValue(RequestVisibleProperty, value); }
         }
-        public static readonly DependencyProperty RequestVisibleProperty =
-            DependencyProperty.Register("RequestVisible", typeof(bool), typeof(LoadingPanel),
-                                        new PropertyMetadata(false, RequestVisible_PropertyChanged));
         private static PropertyPath positionPropertyPath = new PropertyPath(
             "(0).(1)",
             UIElement.RenderTransformProperty,
             TranslateTransform.YProperty
         );
-
-        private Storyboard _visibleStoryboard;
-        private Storyboard _hideStoryboard;
-
-        public int GridRowSpan
-        { set { Grid.SetRowSpan(this, value); } }
+        public static readonly DependencyProperty RequestVisibleProperty =
+            DependencyProperty.Register(
+                "RequestVisible",
+                typeof(bool),
+                typeof(Snackbar),
+                new PropertyMetadata(false, RequestVisible_PropertyChanged)
+            );
 
         private static void RequestVisible_PropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             if ((bool)e.OldValue != (bool)e.NewValue) {
-                var dpObj = d as LoadingPanel;
+                var dpObj = d as Snackbar;
                 switch ((bool)e.NewValue)
                 {
                     case true:
@@ -1219,11 +1285,13 @@ namespace ProgressWindow
             }
         }
 
-        public LoadingPanel()
-        {
-            InitializeComponent();
+        private Storyboard _visibleStoryboard;
+        private Storyboard _hideStoryboard;
 
-            RenderTransform = new TranslateTransform(0, 40);
+        public Snackbar()
+        {
+            RenderTransform = new TranslateTransform(0, -200);
+            Visibility = Visibility.Collapsed;
 
             var enterAnimation = new DoubleAnimation{
                 Duration = TimeSpan.FromMilliseconds(500),
@@ -1240,29 +1308,99 @@ namespace ProgressWindow
             };
             exitAnimation.Completed += (sender, e) => { Visibility = Visibility.Collapsed; };
             _hideStoryboard = exitAnimation.ToStoryboard(this, positionPropertyPath);
+
+            Background = Theme.snackbarBackgroundBrush;
+
+            Style = CreateStyle();
         }
 
-        private void InitializeComponent()
+        private static Style CreateStyle()
         {
-            var spinner = new CustomSpinner{ GridColumn = 0, VerticalAlignment = VerticalAlignment.Center };
-            var message = new CustomTextBlock("BusyMessage"){ GridColumn = 1, FontFamily = SystemFonts.MessageFontFamily };
-            var grid = new Grid{ Height = 40, MinWidth = 40 };
-            grid.RowDefinitions.Add(new RowDefinition{ Height = new GridLength(40) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition{ Width = new GridLength(40) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition{ Width = GridLength.Auto });
+            var header = new FrameworkElementFactory(typeof(ContentPresenter), "Header");
+            header.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            header.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            header.SetValue(ContentPresenter.ContentSourceProperty, "Header");
+            header.SetValue(Grid.ColumnProperty, 0);
 
-            grid.Children.Add(spinner);
-            grid.Children.Add(message);
+            var content = new FrameworkElementFactory(typeof(ContentPresenter), "Content");
+            content.SetValue(Grid.ColumnProperty, 1);
 
-            var containerBorder = new Border{
-                Child = grid,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Background = Theme.snackbarBackgroundBrush,
-                Effect = new DropShadowEffect{ BlurRadius = 6.0, Opacity = 0.3 },
-                CornerRadius = new CornerRadius(20)
+            var row0 = new FrameworkElementFactory(typeof(RowDefinition));
+            row0.SetValue(RowDefinition.HeightProperty, new GridLength(40.0));
+
+            var column0 = new FrameworkElementFactory(typeof(ColumnDefinition));
+            column0.SetValue(ColumnDefinition.WidthProperty, GridLength.Auto);
+            column0.SetValue(ColumnDefinition.MinWidthProperty, 40.0);
+
+            var column1 = new FrameworkElementFactory(typeof(ColumnDefinition));
+            column1.SetValue(ColumnDefinition.WidthProperty, new GridLength(1.0, GridUnitType.Star));
+
+            var grid = new FrameworkElementFactory(typeof(Grid), "Grid");
+            grid.AppendChild(row0);
+            grid.AppendChild(column0);
+            grid.AppendChild(column1);
+            grid.AppendChild(header);
+            grid.AppendChild(content);
+
+            var root = new FrameworkElementFactory(typeof(Border), "TemplateRoot");
+            root.SetValue(Control.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+            root.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            root.SetValue(Border.CornerRadiusProperty, new CornerRadius(20));
+            root.SetValue(UIElement.EffectProperty, new DropShadowEffect{ BlurRadius = 6.0, Opacity = 0.3 });
+            root.AppendChild(grid);
+
+            var ct = new ControlTemplate(typeof(Snackbar)){
+                VisualTree = root,
             };
 
-            Content = containerBorder;
+            var style = new Style(typeof(Snackbar));
+            style.Setters.Add(new Setter(Control.TemplateProperty, ct));
+            return style;
+        }
+    }
+
+    public class LoadingMessage : Snackbar
+    {
+        public LoadingMessage()
+        {
+            Header = new CustomSpinner();
+            Content =  new CustomTextBlock("BusyMessage"){ FontFamily = SystemFonts.MessageFontFamily };
+        }
+    }
+
+    public class CompleteMessage : Snackbar
+    {
+        public CompleteMessage()
+        {
+            Header = new System.Windows.Shapes.Path{
+                Data = Theme.completedGeometry,
+                Fill = Theme.completedIconBrush,
+                Width = 25,
+                Height = 25,
+                Stretch = Stretch.Uniform
+            };
+
+            var openButton = new TileButton(
+                new System.Windows.Shapes.Path{
+                    Data = Theme.playGeometry,
+                    Fill = Theme.foregroundBrush
+                }
+            ){
+                Margin = new Thickness{ Right = 25 }
+            };
+            openButton.SetBinding(ButtonBase.CommandProperty, new OneWayBinding("OpenFileCommand"));
+
+            var stack = new StackPanel{
+                Orientation = Orientation.Horizontal,
+            };
+
+            stack.Children.Add(new CustomTextBlock("CompleteMessage"){
+                FontFamily = SystemFonts.MessageFontFamily,
+                Margin = new Thickness{ Left = 10, Right = 10 }
+            });
+            stack.Children.Add(openButton);
+
+            Content = stack;
         }
     }
 
@@ -1333,25 +1471,22 @@ namespace ProgressWindow
                 UseLayoutRounding = false
             };
 
-            DoubleAnimation arcLeftAnimation1 = new DoubleAnimation{
+            var arcLeftAnimation1 = new DoubleAnimation{
                 Duration = TimeSpan.FromMilliseconds(600),
                 From = 180.0,
                 To = 360.0,
             };
-
-            DoubleAnimation arcLeftAnimation2 = new DoubleAnimation{
+            var arcLeftAnimation2 = new DoubleAnimation{
                 Duration = TimeSpan.FromMilliseconds(400),
                 From = 0.0,
                 To = 180.0,
             };
-
-            DoubleAnimation arcRightAnimation1 = new DoubleAnimation{
+            var arcRightAnimation1 = new DoubleAnimation{
                 Duration = TimeSpan.FromMilliseconds(600),
                 From = 180.0,
                 To = 360.0,
             };
-
-            DoubleAnimation arcRightAnimation2 = new DoubleAnimation{
+            var arcRightAnimation2 = new DoubleAnimation{
                 Duration = TimeSpan.FromMilliseconds(400),
                 From = 0.0,
                 To = 180.0
@@ -1364,27 +1499,10 @@ namespace ProgressWindow
 
             _arcStoryboard = arcLeftStoryboard1;
 
-            arcLeftAnimation1.Completed += (sender, e) =>
-            {
-                if (IsSpinning) {
-                    arcRightStoryboard1.Begin(this);
-                }
-            };
-
-            arcLeftAnimation2.Completed += (sender, e) =>
-            {
-                arcRightStoryboard2.Begin(this);
-            };
-
-            arcRightAnimation1.Completed += (sender, e) =>
-            {
-                arcLeftStoryboard2.Begin(this);
-            };
-
-            arcRightAnimation2.Completed += (sender, e) => 
-            {
-                arcLeftStoryboard1.Begin(this);
-            };
+            arcLeftAnimation1.Completed += (sender, e) => { if (IsSpinning) arcRightStoryboard1.Begin(this); };
+            arcLeftAnimation2.Completed += (sender, e) => { arcRightStoryboard2.Begin(this); };
+            arcRightAnimation1.Completed += (sender, e) => { arcLeftStoryboard2.Begin(this); };
+            arcRightAnimation2.Completed += (sender, e) => { arcLeftStoryboard1.Begin(this); };
 
             var arcLeftBorder = new Border{
                 Child = ArcLeft,
@@ -1566,6 +1684,12 @@ namespace ProgressWindow
             set { _busyMessage = value; NotifyPropertyChanged(); }
         }
 
+        private string _completeMessage = "Encoding completed.";
+        public string CompleteMessage
+        {
+            get { return _completeMessage; }
+            set { _completeMessage = value; NotifyPropertyChanged(); }
+        }
 
         private ICommand _topmostCommand;
         public ICommand TopmostCommand
@@ -1638,6 +1762,13 @@ namespace ProgressWindow
         {
             get { return _openFolderCommand; }
             set { _openFolderCommand = value; NotifyPropertyChanged(); }
+        }
+
+        private ICommand _openFileCommand;
+        public ICommand OpenFileCommand
+        {
+            get { return _openFileCommand; }
+            set { _openFileCommand = value; NotifyPropertyChanged(); }
         }
 
         public ViewModel() 
@@ -1894,7 +2025,17 @@ namespace ProgressWindow
             if (value == null || parameter == null)
                 return Binding.DoNothing;
 
-            return parameter.Equals(value);
+            bool? result = null;
+            try {
+                int status = (int)value;
+                int param = (int)parameter;
+                result = (status & param) == status;
+            } catch (InvalidCastException) { }
+
+            if (result != null)
+                return result;
+            else
+                return Binding.DoNothing;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
@@ -1925,6 +2066,35 @@ namespace ProgressWindow
                 case true:
                     return Visibility.Visible;
                 default:
+                    return Binding.DoNothing;
+            }
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return Binding.DoNothing;
+        }
+    }
+
+    [ValueConversion(typeof(ProgressStatus), typeof(TaskbarItemProgressState))]
+    public class TaskbarItemProgressStateConverter : IValueConverter
+    {
+        public static TaskbarItemProgressStateConverter I = new TaskbarItemProgressStateConverter();
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (value == null || !(value is ProgressStatus))
+                return Binding.DoNothing;
+
+            switch ((ProgressStatus)value) {
+                case ProgressStatus.Initialize:
+                    return TaskbarItemProgressState.Indeterminate;
+                case ProgressStatus.Processing:
+                    return TaskbarItemProgressState.Normal;
+                case ProgressStatus.Suspend:
+                    return TaskbarItemProgressState.Paused;
+                case ProgressStatus.Completed:
+                    return TaskbarItemProgressState.None;
+                default :
                     return Binding.DoNothing;
             }
         }
@@ -2330,6 +2500,7 @@ namespace HelperClasses
 
 public static class ConsoleHelper
 {
+
     public static void WriteLine(object message, int beforLines = 0, int afterLines = 0)
     {
         string format = 
