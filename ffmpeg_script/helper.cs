@@ -14,20 +14,22 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Text;
-using System.Diagnostics;
 using System.Windows.Threading;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Globalization;
 using System.Windows.Shell;
 using System.Windows.Documents;
-using Microsoft.Win32.SafeHandles;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.ConstrainedExecution;
 using System.Security.Permissions;
-using HelperClasses;
+using System.Text.RegularExpressions;
+using System.Reflection;
+using System.Diagnostics;
+using Microsoft.Win32.SafeHandles;
 
 namespace ProgressWindow
 {
@@ -142,7 +144,7 @@ namespace ProgressWindow
 
     public class MainWindow : Window
     {
-        private ViewModel _viewModel;
+        private ProgressViewModel _viewModel;
         private Dispatcher _dp = Dispatcher.CurrentDispatcher;
         private TaskbarItemInfo _taskbarItemInfo = new TaskbarItemInfo();
         public double ProgressProxy
@@ -178,7 +180,7 @@ namespace ProgressWindow
             }
         }
 
-        public MainWindow(ViewModel viewModel)
+        public MainWindow(ProgressViewModel viewModel)
         {
             _viewModel = viewModel;
             DataContext = viewModel;
@@ -399,7 +401,10 @@ namespace ProgressWindow
                     Converter = EnumToBooleanConverter.I,
                     ConverterParameter = ProgressStatus.Processing
             });
-
+            progressBar.SetBinding(
+                CustomProgressBar.EnableActiveAnimationProperty,
+                new OneWayBinding("EnableActiveAnimation"
+            ));
             var remainingText = new CustomTextBlock(
                 "ProgressRemaining",
                 "Estimated remaining time : {0:hh}:{0:mm}:{0:ss}"
@@ -696,6 +701,12 @@ namespace ProgressWindow
                 new OneWayBinding("ProgressStatus"){
                     Converter = EnumToVisibilityConverter.I,
                     ConverterParameter = 1 | 2 | 4
+            });
+            processControlButton.SetBinding(
+                CustomToggleButton.IsCheckedProperty,
+                new OneWayBinding("ProgressStatus"){
+                    Converter = EnumToBooleanConverter.I,
+                    ConverterParameter = 4
             });
             processControlButton.SetBinding(ButtonBase.CommandProperty, new OneWayBinding("ProcessControlCommand"));
             processControlButton.SetBinding(ButtonBase.CommandParameterProperty, new Binding{
@@ -1157,51 +1168,6 @@ namespace ProgressWindow
         }
     }
 
-    internal class OneWayBinding : Binding
-    {
-        internal OneWayBinding(string path) :base(path)
-        {
-            Mode = BindingMode.OneWay;
-            UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged;
-            ConverterCulture = CultureInfo.CurrentUICulture;
-        }
-    }
-
-    internal class TwoWayBinding : Binding
-    {
-        internal TwoWayBinding(string path) :base(path)
-        {
-            Mode = BindingMode.TwoWay;
-            UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged;
-            ConverterCulture = CultureInfo.CurrentUICulture;
-        }
-    }
-
-    public class DelegateCommand : ICommand
-    {
-        public Action<object> ExecuteHandler { get; set; }
-        public Func<object, bool> CanExecuteHandler { get; set; }
-        public event EventHandler CanExecuteChanged;
-
-        public bool CanExecute(object parameter)
-        {
-            if (CanExecuteHandler == null) { return true; }
-            return CanExecuteHandler(parameter);
-        }
-
-        public void Execute(object parameter)
-        {
-            if (ExecuteHandler != null)
-                ExecuteHandler.Invoke(parameter);
-        }
-
-        public void RaiseCanExecuteChanged()
-        {
-            if (CanExecuteChanged != null)
-                CanExecuteChanged.Invoke(this, EventArgs.Empty);
-        }
-    }
-
     internal static class Extensions
     {
         internal static BeginStoryboard ToBegin(this Storyboard storyboard)
@@ -1553,15 +1519,8 @@ namespace ProgressWindow
         );
     }
 
-    public class ViewModel : INotifyPropertyChanged
+    public class ProgressViewModel : ViewModelBase
     {
-        public event PropertyChangedEventHandler PropertyChanged = (sender, e) => { };
-
-        private void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
-        {
-            PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
         private double _progress = 0.0 ;
         public double Progress
         {
@@ -1570,8 +1529,7 @@ namespace ProgressWindow
             {
                 if (_progress < value)
                 {
-                    _progress = value;
-                    NotifyPropertyChanged();
+                    SetProperty(ref _progress, value);
                 }
             }
         }
@@ -1581,10 +1539,7 @@ namespace ProgressWindow
         {
             get { return _progressStatus; }
             set {
-                if (_progressStatus != value) {
-                    _progressStatus = value;
-                    NotifyPropertyChanged();
-                }
+                SetProperty(ref _progressStatus, value);
             }
         }
 
@@ -1592,77 +1547,85 @@ namespace ProgressWindow
         public string ProgressLabel
         {
             get { return _progressLabel; }
-            set { _progressLabel = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _progressLabel, value); }
         }
 
         private string _statusDescription = String.Empty;
         public string StatusDescription
         {
             get { return _statusDescription; }
-            set { _statusDescription = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _statusDescription, value);}
         }
 
         private TimeSpan _progressRemaining;
         public TimeSpan ProgressRemaining
         {
             get { return _progressRemaining; }
-            set { _progressRemaining = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _progressRemaining, value); }
         }
 
         private string _currentOperation;
         public string CurrentOperation
         {
             get { return _currentOperation; }
-            set { _currentOperation = value; NotifyPropertyChanged();}
+            set { SetProperty(ref _currentOperation, value);}
         }
+
+        private bool _enableActiveAnimation = true;
+        public bool EnableActiveAnimation
+        {
+            get { return _enableActiveAnimation; }
+            set { SetProperty(ref _enableActiveAnimation, value); }
+        }
+
 
         private bool _autoClose = false;
         public bool AutoClose
         {
             get { return _autoClose; }
-            set { _autoClose = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _autoClose, value); }
         }
 
         private string _autoCloseText = "Automatically close GUI window.";
         public string AutoCloseText
         {
             get { return _autoCloseText; }
-            set { _autoCloseText = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _autoCloseText, value); }
         }
 
         private bool _autoPlay = false;
         public bool AutoPlay
         {
             get { return _autoPlay; }
-            set { _autoPlay = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _autoPlay, value); }
         }
 
         private string _autoPlayText = "Automatically play output video after encoding.";
         public string AutoPlayText
         {
             get { return _autoPlayText; }
-            set { _autoPlayText = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _autoPlayText, value); }
         }
 
         private bool _openExplorer = false;
         public bool OpenExplorer
         {
             get { return _openExplorer; }
-            set { _openExplorer = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _openExplorer, value); }
         }
 
         private string _openExplorerText = "Open the folder containing the encoded file.";
         public string OpenExplorerText
         {
             get { return _openExplorerText; }
-            set { _openExplorerText = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _openExplorerText, value); }
         }
 
         private bool _windowTopmost = true;
         public bool WindowTopmost
         {
             get { return _windowTopmost; }
-            set { _windowTopmost = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _windowTopmost, value); }
         }
 
         private bool _busy = true;
@@ -1670,10 +1633,7 @@ namespace ProgressWindow
         {
             get { return _busy; }
             set {
-                if (_busy != value) {
-                    _busy = value;
-                    NotifyPropertyChanged();
-                }
+                SetProperty(ref _busy, value);
             }
         }
 
@@ -1681,14 +1641,14 @@ namespace ProgressWindow
         public string BusyMessage
         {
             get { return _busyMessage; }
-            set { _busyMessage = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _busyMessage, value); }
         }
 
         private string _completeMessage = "Encoding completed.";
         public string CompleteMessage
         {
             get { return _completeMessage; }
-            set { _completeMessage = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _completeMessage, value); }
         }
 
         private ICommand _topmostCommand;
@@ -1711,14 +1671,14 @@ namespace ProgressWindow
         public WindowState WindowState
         {
             get { return _windowState; }
-            set { _windowState = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _windowState, value); }
         }
 
         private string _windowTitle = "Progress";
         public string WindowTitle
         {
             get { return _windowTitle; }
-            set { _windowTitle = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _windowTitle, value); }
         }
 
         private ICommand _minimiseCommand;
@@ -1740,38 +1700,38 @@ namespace ProgressWindow
         public ICommand ShowPromptCommand
         {
             get { return _showPromptCommand; }
-            set { _showPromptCommand = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _showPromptCommand, value); }
         }
 
         private ICommand _processControlCommand;
         public ICommand ProcessControlCommand
         {
             get { return _processControlCommand; }
-            set { _processControlCommand = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _processControlCommand, value); }
         }
 
         private ICommand _processExitCommand;
         public ICommand ProcessExitCommand
         {
             get { return _processExitCommand; }
-            set { _processExitCommand = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _processExitCommand, value); }
         }
 
         private ICommand _openFolderCommand;
         public ICommand OpenFolderCommand
         {
             get { return _openFolderCommand; }
-            set { _openFolderCommand = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _openFolderCommand, value); }
         }
 
         private ICommand _openFileCommand;
         public ICommand OpenFileCommand
         {
             get { return _openFileCommand; }
-            set { _openFileCommand = value; NotifyPropertyChanged(); }
+            set { SetProperty(ref _openFileCommand, value); }
         }
 
-        public ViewModel() 
+        public ProgressViewModel() 
         { }
     }
 
@@ -1834,7 +1794,16 @@ namespace ProgressWindow
         }
         public static readonly DependencyProperty IsActiveProperty =
             DependencyProperty.Register("IsActive", typeof(bool), typeof(CustomProgressBar),
-                                        new PropertyMetadata(false, new PropertyChangedCallback(IsActive_PropertyChanged)));
+                                        new PropertyMetadata(false, new PropertyChangedCallback(ActiveStateChanged)));
+
+        public bool EnableActiveAnimation
+        {
+            get { return (bool)GetValue(EnableActiveAnimationProperty); }
+            set { SetValue(EnableActiveAnimationProperty, value); }
+        }
+        public static readonly DependencyProperty EnableActiveAnimationProperty =
+            DependencyProperty.Register("EnableActiveAnimation", typeof(bool), typeof(CustomProgressBar),
+                                        new PropertyMetadata(true, new PropertyChangedCallback(ActiveStateChanged)));
 
         public string LabelText
         {
@@ -1878,26 +1847,22 @@ namespace ProgressWindow
             BeginProgressAnimation();
         }
 
-        private static async void IsActive_PropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        private static async void ActiveStateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             CustomProgressBar source = (CustomProgressBar)d;
-            if ((bool)e.OldValue == (bool)e.NewValue) { return; }
 
-            switch ((bool)e.NewValue)
+            if (source.IsActive && source.EnableActiveAnimation)
             {
-                case true:
-                    source.ResumeProgressAnimation();
-                    break;
-                case false:
-                    for(int l = 50; l > 0; l++) {
-                        if (source._smoothValueActive == false) {
-                            source.PauseProgressAnimation();
-                            break;
-                        } else {
-                            await Task.Delay(100);
-                        }
+                source.ResumeProgressAnimation();
+            } else {
+                for(int l = 50; l > 0; l++) {
+                    if (source._smoothValueActive == false) {
+                        source.PauseProgressAnimation();
+                        break;
+                    } else {
+                        await Task.Delay(100);
                     }
-                    break;
+                }
             }
         }
 
@@ -1959,12 +1924,19 @@ namespace ProgressWindow
                 VisualTree = root
             };
 
+            var enableAnimationTrigger = new Trigger{
+                Property = CustomProgressBar.EnableActiveAnimationProperty,
+                Value = false,
+            };
+            enableAnimationTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "Stripe"));
+
             var completedTrigger = new Trigger{
                 Property = RangeBase.ValueProperty,
                 Value = 100.0,
             };
             completedTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "Stripe"));
             completedTrigger.Setters.Add(new Setter(Shape.FillProperty, Theme.progressBarCompletedBrush, "Indicator"));
+            controlTemplate.Triggers.Add(enableAnimationTrigger);
             controlTemplate.Triggers.Add(completedTrigger);
 
             return controlTemplate;
@@ -2123,11 +2095,12 @@ namespace DropWindow
 
     public class MainWindow : Window
     {
-        private DragDropText _dragDropText = new DragDropText();
-
-        public MainWindow(string caption)
+        public MainWindow(DropWindowViewModel viewModel)
         {
-            Title = caption;
+            DataContext = viewModel;
+
+            SetBinding(TitleProperty, new OneWayBinding("Title"));
+
             Width = 480.0;
             Height = 270.0;
             ShowActivated = true;
@@ -2137,20 +2110,43 @@ namespace DropWindow
             Topmost = true;
             Background = Theme.backgroundBrush;
             ResizeMode = ResizeMode.NoResize;
-            AllowDrop = true;
+            //AllowDrop = true;
 
             InitializeComponent();
         }
 
         private void InitializeComponent()
         {
+            var dragDropText = new DragDropText();
+            dragDropText.SetBinding(DragDropText.DragDropCommandProperty, new OneWayBinding("DropFilesCommand"));
+
             var mainGrid = new Grid();
-            mainGrid.Children.Add(_dragDropText);
+            mainGrid.Children.Add(dragDropText);
             Content = mainGrid;
         }
     }
 
-    internal class DragDropText : ContentControl
+    public class DropWindowViewModel : ViewModelBase
+    {
+        private string _title = "Drag & Drop";
+        public string Title
+        {
+            get { return _title; }
+            set { SetProperty(ref _title, value); }
+        }
+
+        private ICommand _dropFilesCommand;
+        public ICommand DropFilesCommand
+        {
+            get { return _dropFilesCommand; }
+            set { SetProperty(ref _dropFilesCommand, value); }
+        }
+
+        public DropWindowViewModel()
+        {}
+    }
+
+    internal class DragDropText : UserControl
     {
         private TextBlock _textBlock;
 
@@ -2160,8 +2156,17 @@ namespace DropWindow
         private double _strokeDashSpace;
         private Brush _Fill;
 
+        public ICommand DragDropCommand {
+            get { return (ICommand)GetValue(DragDropCommandProperty); }
+            set { SetValue(DragDropCommandProperty, value); }
+        }
+        public static readonly DependencyProperty DragDropCommandProperty =
+            DependencyProperty.Register("DragDropCommand", typeof(ICommand), typeof(DragDropText),
+                                        new PropertyMetadata(null));
+
         public DragDropText()
         {
+            AllowDrop = true;
 
             _textBlock = new TextBlock
             {
@@ -2186,6 +2191,12 @@ namespace DropWindow
             _Fill = Brushes.Transparent;
 
             Content = _textBlock;
+        }
+
+        protected override void OnDrop(System.Windows.DragEventArgs e)
+        {
+            if (DragDropCommand != null && DragDropCommand.CanExecute(null))
+                    DragDropCommand.Execute(e);
         }
 
         protected override void OnRender(DrawingContext drawingContext)
@@ -2239,8 +2250,12 @@ namespace HelperClasses
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.MayFail)]
         internal extern static bool CloseHandle(IntPtr handle);
 
-        private SafeThreadHandle()
-            : base(true)
+        public SafeThreadHandle(IntPtr handle) : this()
+        {
+            SetHandle(handle);
+        }
+
+        private SafeThreadHandle() : base(true)
         { }
 
         [ReliabilityContract(Consistency.WillNotCorruptState, Cer.MayFail)]
@@ -2264,15 +2279,34 @@ namespace HelperClasses
 
         private IntPtr _hWnd = IntPtr.Zero;
 
-        public WindowHelper(string windowTitle)
+        public WindowHelper(string windowTitle, int timeOutMillis = 1000)
         {
-            Process[] localAll = Process.GetProcesses();
-            try {
-                var targetProcess = localAll.Where(p => p.MainWindowTitle == windowTitle).First();
-                _hWnd = targetProcess.MainWindowHandle;
-            } catch (Exception e) {
-                Debug.WriteLine(e);
+            RetryUntilSuccessOrTimeout(() => {
+                var targetProcess = Process.GetProcesses().FirstOrDefault(p => p.MainWindowTitle == windowTitle);
+                if(targetProcess != null)
+                {
+                    _hWnd = targetProcess.MainWindowHandle;
+                    return true;
+                } else {
+                    return false;
+                }
+            }, TimeSpan.FromMilliseconds(timeOutMillis), TimeSpan.FromMilliseconds(100));
+        }
+
+        public static bool RetryUntilSuccessOrTimeout( Func<bool> task , TimeSpan timeout , TimeSpan pause )
+        {
+            if ( pause.TotalMilliseconds < 0 )
+            {
+                throw new ArgumentException( "pause must be >= 0 milliseconds" );
             }
+            var stopwatch = Stopwatch.StartNew();
+            do
+            {
+                if ( task() ) { return true; }
+                    Thread.Sleep( (int)pause.TotalMilliseconds );
+            }
+            while ( stopwatch.Elapsed < timeout );
+            return false;
         }
 
         public void HideConsole()
@@ -2365,16 +2399,16 @@ namespace HelperClasses
         {
             get { return _receivedData; }
         }
-        public ProcessInfo(string filename, string argumentList, bool useShellExec = false, bool redirect = true)
+        public ProcessInfo(string filename, string argumentList, bool noRedirect = false)
         {
             _startInfo = new ProcessStartInfo
             {
                 FileName = filename,
                 Arguments = argumentList,
-                UseShellExecute = useShellExec,
-                RedirectStandardOutput = redirect,
-                RedirectStandardError = redirect,
-                RedirectStandardInput = redirect
+                UseShellExecute = noRedirect,
+                RedirectStandardOutput = !noRedirect,
+                RedirectStandardError = !noRedirect,
+                RedirectStandardInput = !noRedirect
             };
 
             IsSuspended = false;
@@ -2425,46 +2459,50 @@ namespace HelperClasses
             {
                 try
                 {
-                    _process.OutputDataReceived += (sender, e) =>
-                    {
-                        Task.Run(() =>
+                    if (!_startInfo.UseShellExecute) {
+                        _process.OutputDataReceived += (sender, e) =>
                         {
-                            if (!String.IsNullOrEmpty(e.Data))
+                            Task.Run(() =>
                             {
-                                _receivedData.TryAdd(
-                                    new ReceivedData(
-                                        e.Data,
-                                        ReceivedData.DataType.StdOut
-                                    ),
-                                    System.Threading.Timeout.Infinite
-                                );
-                            }
-                        });
-                    };
-                    _process.ErrorDataReceived += (sender, e) =>
-                    {
-                        Task.Run(() =>
+                                if (!String.IsNullOrEmpty(e.Data))
+                                {
+                                    _receivedData.TryAdd(
+                                        new ReceivedData(
+                                            e.Data,
+                                            ReceivedData.DataType.StdOut
+                                        ),
+                                        System.Threading.Timeout.Infinite
+                                    );
+                                }
+                            });
+                        };
+                        _process.ErrorDataReceived += (sender, e) =>
                         {
-                            if (!String.IsNullOrEmpty(e.Data))
+                            Task.Run(() =>
                             {
-                                _receivedData.TryAdd(
-                                    new ReceivedData(
-                                        e.Data,
-                                        ReceivedData.DataType.StdError
-                                    ),
-                                    System.Threading.Timeout.Infinite
-                                );
-                            }
-                        });
-                    };
+                                if (!String.IsNullOrEmpty(e.Data))
+                                {
+                                    _receivedData.TryAdd(
+                                        new ReceivedData(
+                                            e.Data,
+                                            ReceivedData.DataType.StdError
+                                        ),
+                                        System.Threading.Timeout.Infinite
+                                    );
+                                }
+                            });
+                        };
+                    }
                     _process.Exited += (sender, e) =>
                     {
                         _receivedData.CompleteAdding();
                         _eventHandled.TrySetResult(_process.ExitCode);
                     };
                     _process.Start();
-                    _process.BeginOutputReadLine();
-                    _process.BeginErrorReadLine();
+                    if (!_startInfo.UseShellExecute) {
+                        _process.BeginErrorReadLine();
+                        _process.BeginOutputReadLine();
+                    }
                     //_process.PriorityClass = ProcessPriorityClass.High;
                 }
                 catch (Exception e)
@@ -2494,6 +2532,32 @@ namespace HelperClasses
                 }
                 _disposed = true;
             }
+        }
+    }
+    
+    public class CommentOutText
+    {
+        private const string pattern1 = "//.*";
+        private const string pattern2 = @" {2,}";
+        private char[] pattern3 = "\r\n".ToCharArray();
+
+        private List<string> _strings;
+        public CommentOutText(string text)
+        {
+            var temp = Regex.Replace(text, pattern1, String.Empty);
+            _strings = Regex.Replace(temp, pattern2, " ").Split(pattern3).ToList();
+            _strings.RemoveAll(s => String.IsNullOrWhiteSpace(s));
+        }
+
+        public void Replace(string pattern, string replace, RegexOptions regexOptions = RegexOptions.None)
+        {
+            var temp = Regex.Replace(String.Join("\n", _strings), pattern, replace);
+            _strings = temp.Split('\n').ToList();
+        }
+
+        public string GetText(string separator)
+        {
+            return String.Join(separator, _strings);
         }
     }
 }
@@ -2526,5 +2590,77 @@ public static class ConsoleHelper
         Console.ForegroundColor = ConsoleColor.Yellow;
         WriteLine(message, beforLines, afterLines);
         Console.ResetColor();
+    }
+
+    public static void Info(object message, int beforLines = 0, int afterLines = 0)
+    {
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        WriteLine(message, beforLines, afterLines);
+        Console.ResetColor();
+    }
+}
+
+public abstract class ViewModelBase : INotifyPropertyChanged
+{
+    public event PropertyChangedEventHandler PropertyChanged;
+
+    protected virtual bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string propertyName = null)
+    {
+        if (object.Equals(storage, value)) return false;
+
+        storage = value;
+        OnPropertyChanged(propertyName);
+        return true;
+    }
+
+    protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+    {
+        if (PropertyChanged != null)
+            PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+}
+
+public class DelegateCommand : ICommand
+{
+    public Action<object> ExecuteHandler { get; set; }
+    public Func<object, bool> CanExecuteHandler { get; set; }
+    public event EventHandler CanExecuteChanged;
+
+    public bool CanExecute(object parameter)
+    {
+        if (CanExecuteHandler == null) { return true; }
+        return CanExecuteHandler(parameter);
+    }
+
+    public void Execute(object parameter)
+    {
+        if (ExecuteHandler != null)
+            ExecuteHandler.Invoke(parameter);
+    }
+
+    public void RaiseCanExecuteChanged()
+    {
+        if (CanExecuteChanged != null)
+            CanExecuteChanged.Invoke(this, EventArgs.Empty);
+    }
+}
+
+internal class OneWayBinding : Binding
+{
+    internal OneWayBinding(string path) :base(path)
+    {
+        Mode = BindingMode.OneWay;
+        UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged;
+        ConverterCulture = CultureInfo.CurrentUICulture;
+    }
+}
+
+internal class TwoWayBinding : Binding
+{
+    internal TwoWayBinding(string path) :base(path)
+    {
+        Mode = BindingMode.TwoWay;
+        UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged;
+        ConverterCulture = CultureInfo.CurrentUICulture;
     }
 }

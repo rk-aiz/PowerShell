@@ -12,7 +12,7 @@ param(
     [Parameter()]
     [Alias("input")] [string] $path,
     [Parameter()]
-    [string] $output,
+    [switch] $StartPaused,
     [Parameter()]
     [switch] $ForceCompileAssembly = $false
 )
@@ -23,18 +23,42 @@ Set-Location -LiteralPath $PSScriptRoot
 # Internal parameter variables
 # ------------------------------------
 $global:path = $path.trim("`'")
-$global:output = $output.trim("`'")
 
 $OUTPUT_DIRECTORY = "Encode"
 $OUTPUT_EXTENSION = ".mp4"
 
+$FFMPEG_PARAMETERS = @'
+-hide_banner
+//-loglevel info
+-ignore_unknown
+-dn
+-y
+-i [INPUT]
+-analyzeduration 30M -probesize 30M
+-c:v libx264
+-maxrate 30M
+-bufsize 30M
+-preset veryfast
+-crf 14
+-pix_fmt yuv420p
+-c:a aac -ab 256000 -af "channelmap=channel_layout=stereo,aresample=48000:resampler=soxr"
+[OUTPUT]
+'@
+
+$INPUT_PATTERN = "\[INPUT\]"
+$OUTPUT_PATTERN = "\[OUTPUT\]"
+$REGEX_OPT = [Text.RegularExpressions.RegexOptions]::IgnoreCase
+
+$TASK_NAME = "$([System.IO.Path]::GetFileName($global:path)) - $($myInvocation.MyCommand.name)"
 $AUTO_CLOSE_GUI_WINDOW = $false
 $AUTO_PLAY_ENCODED = $false
 $OPEN_FOLDER_ENCODED = $false
 $SHOW_CONSOLE_PROGRESSBAR = $false
-
+$ENABLE_ACTIVE_ANIMATION = $false
 $FFMPEG_FILE = "ffmpeg.exe"
 $FFPROBE_FILE = "ffprobe.exe"
+
+$NO_REDIRECT = $false
 
 $OpenFileScript = {
     param([string]$filePath)
@@ -56,31 +80,6 @@ $CS_ASSEMBLY = "helper.dll"
 # ------------------------------------
 # Helper functions
 # ------------------------------------
-
-# Get ffmpeg parameters
-function GetFFmpegParams {
-    param($path, $output)
-
-    $ffmpegParams = @(
-        '-hide_banner',
-        #'-loglevel info',
-        '-ignore_unknown',
-        '-dn',
-        '-y',
-        "-i `"$path`"",
-        '-analyzeduration 30M -probesize 30M',
-        '-c:v libx264',
-        '-maxrate 30M',
-        '-bufsize 30M',
-        '-preset fast',
-        '-crf 14',
-        '-pix_fmt yuv420p',
-        '-c:a aac -ab 256000 -af "channelmap=channel_layout=stereo,aresample=48000:resampler=soxr"',
-        ('"{0}"' -f $output)
-    )
-
-    return ,$ffmpegParams
-}
 
 # Resolve output file path
 function ResolveOutputPath {
@@ -107,13 +106,16 @@ function ResolveOutputPath {
 # Show file drop window
 # Return whether the window was manually closed
 function showDropWindow {
-    param([string]$caption)
-    $FileDropWindow = New-Object DropWindow.MainWindow($caption)
+    param([string]$caption, $FFMPEG_PARAMETERS)
 
-    $FileDropWindow.Add_Drop({
-        param($sender, $e)
+    $DropWindowViewModel = New-Object DropWindow.DropWindowViewModel
+    $DropWindowViewModel.Title = $caption
+
+    $dropFilesCommand = New-Object DelegateCommand
+    $dropFilesCommand.ExecuteHandler = {
+        param($param)
         
-        $fileList = $e.Data.GetFileDropList()
+        $fileList = $param.Data.GetFileDropList()
 
         switch ($fileList.Count){
             0 { break }
@@ -124,14 +126,22 @@ function showDropWindow {
                 break
             }
             Default
-            { # TODO Implementation of multiple file drop support
-                $global:path = $fileList[0]
+            {   
+                $global:ProcessManagerMode = $true
+                $ProcessList = New-Object System.Collections.Generic.List[System.Diagnostics.Process]
+                foreach ($f in $fileList) {
+                    $proc = Start-Process powershell.exe -ArgumentList "-ExecutionPolicy RemoteSigned -File `"$($MyInvocation.ScriptName)`" -path `"$f`" -StartPaused"
+                    Start-Sleep -Milliseconds 100
+                    $ProcessList.Add($proc)
+                }
                 $FileDropWindow.DialogResult = $true
                 break
             }
         }
-    })
+    }
+    $DropWindowViewModel.DropFilesCommand = $dropFilesCommand
 
+    $FileDropWindow = New-Object DropWindow.MainWindow($DropWindowViewModel)
     return $FileDropWindow.ShowDialog()
 }
 
@@ -199,29 +209,21 @@ Try {
 
 # check ffmpeg.exe
 [ConsoleHelper]::WriteLine("######    FFmpeg version    ######", 1, 1)
+$checkFfmpegProc = $null
 try {
-    Start-Process $FFMPEG_FILE ('-version') -Wait -NoNewWindow
+    $checkFfmpegProc = Start-Process $FFMPEG_FILE ('-version') -NoNewWindow
 } catch {
     [ConsoleHelper]::Error("Error : ffmpeg.exe was not found.", 1, 5)
     exit 2
-}
-
-# check ffmpeg parameters
-[ConsoleHelper]::WriteLine("######    Encode parameters    ######", 1)
-[ConsoleHelper]::WriteLine(((GetFFmpegParams '[input]' '[output]') -join "`r`n"), 1, 1)
-
-# check [$Error]
-if ($Error.Count -gt 0) {
-    $Error
-    exit 1
 }
 
 # Get console window and set window title
 $uniqueWindowTitle = New-Guid
 $Host.UI.RawUI.WindowTitle = $uniqueWindowTitle
 $ConsoleWindow = New-Object HelperClasses.WindowHelper($uniqueWindowTitle)
-
 $Host.UI.RawUI.WindowTitle = $myInvocation.MyCommand.name
+
+$global:ProcessManagerMode = $false
 
 # Show file drop dialog.
 while ((checkFilePath $global:path) -ne $true) {
@@ -237,6 +239,15 @@ while ((checkFilePath $global:path) -ne $true) {
         Start-Sleep 2
         exit 0
     }
+    
+    if ($global:ProcessManagerMode -eq $true) {
+        [ConsoleHelper]::Log("Multiple file mode", 1)
+        exit 0
+    }
+}
+
+if ($null -ne $checkFfmpegProc) {
+    $checkFfmpegProc.WaitForExit(1000)
 }
 
 # Resolve path for the output file
@@ -244,12 +255,27 @@ if ([String]::IsNullOrEmpty($global:output)) {
     $global:output = ResolveOutputPath $global:path $OUTPUT_EXTENSION $OUTPUT_DIRECTORY
 }
 
-[ConsoleHelper]::Log("Input file : $global:path", 1)
-[ConsoleHelper]::Log("Output file : $global:output", 0, 2)
+[ConsoleHelper]::Log("Input file  : $global:path", 2)
+[ConsoleHelper]::Log("Output file : $global:output", 0, 1)
 
 
-$ffmpegParams = GetFFmpegParams $global:path $global:output
-$ffmpegProcess = New-Object HelperClasses.ProcessInfo($FFMPEG_FILE, ($ffmpegParams -join ' '))
+# check ffmpeg parameters
+
+$replacedParams = New-Object HelperClasses.CommentOutText($FFMPEG_PARAMETERS)
+$replacedParams.Replace($INPUT_PATTERN, "`"$($global:path)`"", $REGEX_OPT)
+$replacedParams.Replace($OUTPUT_PATTERN, "`"$($global:output)`"", $REGEX_OPT)
+
+[ConsoleHelper]::Info("######    Encode parameters    ######", 1)
+[ConsoleHelper]::Info($replacedParams.GetText("`n`r"), 1, 3)
+
+# check [$Error]
+if ($Error.Count -gt 0) {
+    $Error
+    exit 1
+}
+
+#$FFMPEG_PARAMETERS = GetFFmpegParams $global:path $global:output
+$ffmpegProcess = New-Object HelperClasses.ProcessInfo($FFMPEG_FILE, $replacedParams.GetText(" "), $NO_REDIRECT)
 
 $ffprobeParams = @(
     '-v error',
@@ -276,18 +302,18 @@ $syncData = [HashTable]::Synchronized(@{
     termination = $false
 })
 
-$taskName = "$([System.IO.Path]::GetFileName($global:path)) - $($myInvocation.MyCommand.name)"
-
 # Create ViewModel of progress window.
-$viewModel = New-Object ProgressWindow.ViewModel
+$viewModel = New-Object ProgressWindow.ProgressViewModel
 $viewModel.CurrentOperation = "Preparing."
 $viewModel.ProgressLabel = "-> $([System.IO.Path]::GetFileName($global:output))"
-$viewModel.WindowTitle = $taskName
+$viewModel.WindowTitle = $TASK_NAME
 $viewModel.AutoClose = $AUTO_CLOSE_GUI_WINDOW
 $viewModel.AutoPlay = $AUTO_PLAY_ENCODED
 $viewModel.OpenExplorer = $OPEN_FOLDER_ENCODED
+$viewModel.EnableActiveAnimation = $ENABLE_ACTIVE_ANIMATION
 
-$showPromptCommand = New-Object ProgressWindow.DelegateCommand
+# Create delegates for command bindings
+$showPromptCommand = New-Object DelegateCommand
 $showPromptCommand.ExecuteHandler = {
     param($param)
     if ([bool]$param) {
@@ -298,7 +324,7 @@ $showPromptCommand.ExecuteHandler = {
 }
 $viewModel.ShowPromptCommand = $showPromptCommand
 
-$processControlCommand = New-Object ProgressWindow.DelegateCommand
+$processControlCommand = New-Object DelegateCommand
 $processControlCommand.ExecuteHandler = {
     param($param)
 
@@ -312,7 +338,7 @@ $processControlCommand.ExecuteHandler = {
 }
 $viewModel.ProcessControlCommand = $processControlCommand
 
-$processExitCommand = New-Object ProgressWindow.DelegateCommand
+$processExitCommand = New-Object DelegateCommand
 $processExitCommand.ExecuteHandler = {
     param($param)
 
@@ -325,10 +351,10 @@ $processExitCommand.ExecuteHandler = {
 
     [System.Diagnostics.Process]$process = $null
     if ($ffmpegProcess.TryGetProcess([ref]$process)) {
-        $streamWriter = $process.StandardInput; # this required to send StandardInput stream
+        $streamWriter = $process.StandardInput
         if ($streamWriter -ne $null) {
             $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Suspend
-            $streamWriter.WriteLine("q"); #this will send q as an input to the ffmpeg process window making it stop.
+            $streamWriter.WriteLine("q") # Send q as an input to the ffmpeg process window making it stop.
 
             if ($ffmpegProcess.IsSuspended) {
                 $ffmpegProcess.Resume()
@@ -341,13 +367,13 @@ $processExitCommand.ExecuteHandler = {
 }
 $viewModel.ProcessExitCommand = $processExitCommand
 
-$openFolderCommand = New-Object ProgressWindow.DelegateCommand
+$openFolderCommand = New-Object DelegateCommand
 $openFolderCommand.ExecuteHandler = {
     $OpenExplorerScript.Invoke($syncData.output)
 }
 $viewModel.OpenFolderCommand = $openFolderCommand
 
-$openFileCommand = New-Object ProgressWindow.DelegateCommand
+$openFileCommand = New-Object DelegateCommand
 $openFileCommand.ExecuteHandler = {
     $OpenFileScript.Invoke($syncData.output)
 }
@@ -358,7 +384,7 @@ $viewModel.OpenFileCommand = $openFileCommand
 # ------------------------------------
 # Handle stderr output from the ffmpeg process
 $runspaceScript = {
-    param($PSHost, $taskName)
+    param($PSHost, $taskName, $StartPaused)
 
     $timePattern = "time=\D*([\d\.:]+)"
     $fpsPattern = "fps=\D*(\d+)"
@@ -367,6 +393,7 @@ $runspaceScript = {
 
     [HelperClasses.ReceivedData]$ffprobeOutput = [HelperClasses.ReceivedData]::Empty
 
+    # [ProgressRecord] is for console progress bar
     $progressRecord = New-Object System.Management.Automation.ProgressRecord(1, $taskName, 'Initialize')
     $progressRecord.RecordType = [System.Management.Automation.ProgressRecordType]::Processing
     $currentOperation = $syncData.path
@@ -378,6 +405,11 @@ $runspaceScript = {
     $ffmpegTask = $ffmpegProcess.Start()
 
     $viewModel.CurrentOperation = $currentOperation
+    
+    if ($StartPaused) {
+        $viewModel.BusyMessage = "On pause."
+        $viewModel.ProcessControlCommand.Execute($true)
+    }
 
     while (-not $ffmpegTask.Wait(500)) {
         foreach ($receivedData in $ffmpegProcess.ReceivedDataQueue.GetConsumingEnumerable())
@@ -549,6 +581,7 @@ try{
     exit 1
 }
 
+# Create and setup runspace
 $Runspace = [RunSpaceFactory]::CreateRunspace()
 $Runspace.ApartmentState = "STA"
 $Runspace.Open()
@@ -557,12 +590,14 @@ $Runspace.SessionStateProxy.setVariable("ffprobeProcess", $ffprobeProcess)
 $Runspace.SessionStateProxy.setVariable("progressWindow", $progressWindow)
 $Runspace.SessionStateProxy.setVariable("syncData", $syncData)
 $Runspace.SessionStateProxy.setVariable("viewModel", $viewModel)
-$PowerShell = [PowerShell]::Create().AddScript($runspaceScript).AddArgument($Host).AddArgument($taskName)
+$PowerShell = [PowerShell]::Create().AddScript($runspaceScript).AddArgument($Host).AddArgument($TASK_NAME).AddArgument($StartPaused)
 $PowerShell.Runspace = $Runspace
 $IASyncResult = $PowerShell.BeginInvoke()
 
+# Hide console
 $viewModel.ShowPromptCommand.Execute($false)
 
+# Show WPF window
 $result = $false
 try{
     $result = $progressWindow.ShowDialog();
