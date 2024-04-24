@@ -1,4 +1,4 @@
-##
+﻿##
 # FFMPEG GUI Script
 #
 <#
@@ -28,8 +28,8 @@ $OUTPUT_DIRECTORY = "Encode"
 $OUTPUT_EXTENSION = ".mp4"
 
 $FFMPEG_PARAMETERS = @'
--hide_banner
-//-loglevel info
+//-hide_banner
+-loglevel repeat+level+verbose
 -ignore_unknown
 -dn
 -y
@@ -38,12 +38,29 @@ $FFMPEG_PARAMETERS = @'
 -c:v libx264
 -maxrate 30M
 -bufsize 30M
--preset veryfast
--crf 14
+-preset medium
+-crf 23
 -pix_fmt yuv420p
 -c:a aac -ab 256000 -af "channelmap=channel_layout=stereo,aresample=48000:resampler=soxr"
 [OUTPUT]
 '@
+
+# TODO  detect "Conversion failed!" "Error"
+
+<# TODO progressbar intermidiate state
+$FFMPEG_PARAMETERS = @'
+-hide_banner
+//-loglevel info
+-ignore_unknown
+-dn
+-y
+-i [INPUT]
+-analyzeduration 30M -probesize 30M
+-c:v copy
+-c:a copy
+[OUTPUT]
+'@
+#>
 
 $INPUT_PATTERN = "\[INPUT\]"
 $OUTPUT_PATTERN = "\[OUTPUT\]"
@@ -53,6 +70,8 @@ $TASK_NAME = "$([System.IO.Path]::GetFileName($global:path)) - $($myInvocation.M
 $AUTO_CLOSE_GUI_WINDOW = $false
 $AUTO_PLAY_ENCODED = $false
 $OPEN_FOLDER_ENCODED = $false
+$PREVENT_SLEEP = $true
+$PREVENT_SLEEP_STATE = [UInt32]0x00000002 # $ES_SYSTEM_REQUIRED = [UInt32]0x00000002 : , $ES_DISPLAY_REQUIRED = [UInt32]0x00000002,
 $SHOW_CONSOLE_PROGRESSBAR = $false
 $ENABLE_ACTIVE_ANIMATION = $false
 $FFMPEG_FILE = "ffmpeg.exe"
@@ -85,12 +104,12 @@ $CS_ASSEMBLY = "helper.dll"
 function ResolveOutputPath {
     param([string]$path, [string]$extension, [string]$folder)
 
-    ### 拡張子が異なる場合
+    ### 拡張子が異なる場吁E
     if ([System.IO.Path]::GetExtension($path) -ne $extension) {
         return ([System.IO.Path]::ChangeExtension($path, $extension))
     }
 
-    ### 拡張子が同じ場合
+    ### 拡張子が同じ場吁E
     [System.IO.DirectoryInfo]$di = $(if ([System.IO.Path]::IsPathRooted($folder)) {
         New-Object System.IO.DirectoryInfo($folder)
     } else {
@@ -130,7 +149,7 @@ function showDropWindow {
                 $global:ProcessManagerMode = $true
                 $ProcessList = New-Object System.Collections.Generic.List[System.Diagnostics.Process]
                 foreach ($f in $fileList) {
-                    $proc = Start-Process powershell.exe -ArgumentList "-ExecutionPolicy RemoteSigned -File `"$($MyInvocation.ScriptName)`" -path `"$f`" -StartPaused"
+                    $proc = Start-Process powershell.exe -PassThru -ArgumentList "-ExecutionPolicy RemoteSigned -File `"$($MyInvocation.ScriptName)`" -path `"$f`" -StartPaused"
                     Start-Sleep -Milliseconds 100
                     $ProcessList.Add($proc)
                 }
@@ -211,7 +230,7 @@ Try {
 [ConsoleHelper]::WriteLine("######    FFmpeg version    ######", 1, 1)
 $checkFfmpegProc = $null
 try {
-    $checkFfmpegProc = Start-Process $FFMPEG_FILE ('-version') -NoNewWindow
+    $checkFfmpegProc = Start-Process $FFMPEG_FILE ('-version') -NoNewWindow -PassThru
 } catch {
     [ConsoleHelper]::Error("Error : ffmpeg.exe was not found.", 1, 5)
     exit 2
@@ -266,7 +285,7 @@ $replacedParams.Replace($INPUT_PATTERN, "`"$($global:path)`"", $REGEX_OPT)
 $replacedParams.Replace($OUTPUT_PATTERN, "`"$($global:output)`"", $REGEX_OPT)
 
 [ConsoleHelper]::Info("######    Encode parameters    ######", 1)
-[ConsoleHelper]::Info($replacedParams.GetText("`n`r"), 1, 3)
+[ConsoleHelper]::Info($replacedParams.GetText("`n"), 1, 3)
 
 # check [$Error]
 if ($Error.Count -gt 0) {
@@ -300,19 +319,13 @@ $syncData = [HashTable]::Synchronized(@{
     openExplorer = $OpenExplorerScript
     showConsoleProgress = $SHOW_CONSOLE_PROGRESSBAR
     termination = $false
+    previousState = $null
 })
 
 # Create ViewModel of progress window.
 $viewModel = New-Object ProgressWindow.ProgressViewModel
-$viewModel.CurrentOperation = "Preparing."
-$viewModel.ProgressLabel = "-> $([System.IO.Path]::GetFileName($global:output))"
-$viewModel.WindowTitle = $TASK_NAME
-$viewModel.AutoClose = $AUTO_CLOSE_GUI_WINDOW
-$viewModel.AutoPlay = $AUTO_PLAY_ENCODED
-$viewModel.OpenExplorer = $OPEN_FOLDER_ENCODED
-$viewModel.EnableActiveAnimation = $ENABLE_ACTIVE_ANIMATION
 
-# Create delegates for command bindings
+# Create DelegateCommand for command bindings
 $showPromptCommand = New-Object DelegateCommand
 $showPromptCommand.ExecuteHandler = {
     param($param)
@@ -378,6 +391,30 @@ $openFileCommand.ExecuteHandler = {
     $OpenFileScript.Invoke($syncData.output)
 }
 $viewModel.OpenFileCommand = $openFileCommand
+
+$changeExecutionStateCommand = New-Object DelegateCommand
+$changeExecutionStateCommand.ExecuteHandler = {
+    param($param)
+
+    if ($viewModel.PreventSleep -eq $true) {
+        [ThreadHelper]::PreventSleep($PREVENT_SLEEP_STATE)
+        [ConsoleHelper]::Log("Prevent sleep mode enabled.")
+    } else {
+        [ThreadHelper]::AllowSleep()
+        [ConsoleHelper]::Log("Prevent sleep mode disabled.")
+    }
+}
+$viewModel.ChangeExecutionStateCommand = $changeExecutionStateCommand
+
+# Some commands are fired at the value setter, so the property is set after the command preparation
+$viewModel.CurrentOperation = "Preparing."
+$viewModel.ProgressLabel = "-> $([System.IO.Path]::GetFileName($global:output))"
+$viewModel.WindowTitle = $TASK_NAME
+$viewModel.AutoClose = $AUTO_CLOSE_GUI_WINDOW
+$viewModel.AutoPlay = $AUTO_PLAY_ENCODED
+$viewModel.OpenExplorer = $OPEN_FOLDER_ENCODED
+$viewModel.PreventSleep = $PREVENT_SLEEP
+$viewModel.EnableActiveAnimation = $ENABLE_ACTIVE_ANIMATION
 
 # ------------------------------------
 # Runspace execution
@@ -546,7 +583,7 @@ $runspaceScript = {
 
     if (($syncData.exitCode -eq 0) -and ($syncData.termination -eq $false)) {
         
-        # --- たまに99.9%でプロセスが終了してしまうようなので対策コード ※要調査
+        # --- たまに99.9%でプロセスが終亁E��てしまぁE��ぁE��ので対策コーチE※要調査
         $viewModel.Progress = 100.0
         $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Completed
         # -----------------------------------------------------------------

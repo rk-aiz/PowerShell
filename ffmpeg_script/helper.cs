@@ -437,35 +437,70 @@ namespace ProgressWindow
             };
 
             var optionsGrid = new Grid();
-
+            optionsGrid.ColumnDefinitions.Add(new ColumnDefinition{ Width = GridLength.Auto });
+            optionsGrid.ColumnDefinitions.Add(new ColumnDefinition{ Width = GridLength.Auto });
             optionsGrid.RowDefinitions.Add(new RowDefinition{ Height = GridLength.Auto });
             optionsGrid.RowDefinitions.Add(new RowDefinition{ Height = GridLength.Auto });
             optionsGrid.RowDefinitions.Add(new RowDefinition{ Height = GridLength.Auto });
+            optionsGrid.RowDefinitions.Add(new RowDefinition{ Height = GridLength.Auto });
 
-            var switchAutoClose = new CustomSwitch{
-                Content = new CustomTextBlock("AutoCloseText") { FontSize = 14.0},
-                Margin = new Thickness(20, 15, 40, 7.5),
-                GridRow = 0
+            var switchAutoCloseText = new CustomTextBlock("AutoCloseText"){
+                FontSize = 14.0,
             };
-            switchAutoClose.SetBinding(CustomSwitch.IsOnProperty, new TwoWayBinding("AutoClose"));
 
-            var switchAutoPlay = new CustomSwitch{
-                Content = new CustomTextBlock("AutoPlayText") { FontSize = 14.0},
-                Margin = new Thickness(20, 7.5, 40, 7.5),
-                GridRow = 1
+            var switchAutoClose = new ToggleSwitch{
+                Padding = new Thickness(10, 5, 0, 5),
+                GridRow = 0,
+                GridColumn = 1
             };
-            switchAutoPlay.SetBinding(CustomSwitch.IsOnProperty, new TwoWayBinding("AutoPlay"));
+            switchAutoClose.SetBinding(ToggleSwitch.IsOnProperty, new TwoWayBinding("AutoClose"));
 
-            var switchOpenExplorer = new CustomSwitch{
-                Content = new CustomTextBlock("OpenExplorerText") { FontSize = 14.0},
-                Margin = new Thickness(20, 7.5, 40, 7.5),
-                GridRow = 2
+
+            var switchAutoPlayText = new CustomTextBlock("AutoPlayText"){
+                FontSize = 14.0, 
+                GridRow = 1,
             };
-            switchOpenExplorer.SetBinding(CustomSwitch.IsOnProperty, new TwoWayBinding("OpenExplorer"));
+            var switchAutoPlay = new ToggleSwitch{
+                Padding = new Thickness(10, 5, 0, 5),
+                GridRow = 1,
+                GridColumn = 1
+            };
+            switchAutoPlay.SetBinding(ToggleSwitch.IsOnProperty, new TwoWayBinding("AutoPlay"));
+
+
+            var switchOpenExplorerText = new CustomTextBlock("OpenExplorerText") { 
+                GridRow = 2,
+                FontSize = 14.0
+            };
+
+            var switchOpenExplorer = new ToggleSwitch{
+                Padding = new Thickness(10, 5, 0, 5),
+                GridRow = 2,
+                GridColumn = 1
+            };
+            switchOpenExplorer.SetBinding(ToggleSwitch.IsOnProperty, new TwoWayBinding("OpenExplorer"));
+
+            var switchPreventSleepText = new CustomTextBlock("PreventSleepText") { 
+                GridRow = 3,
+                FontSize = 14.0
+            };
+
+            var switchPreventSleep = new ToggleSwitch{
+                Padding = new Thickness(10, 5, 0, 5),
+                GridRow = 3,
+                GridColumn = 1
+            };
+            switchPreventSleep.SetBinding(ToggleSwitch.IsOnProperty, new TwoWayBinding("PreventSleep"));
+
+            optionsGrid.Children.Add(switchAutoCloseText);
+            optionsGrid.Children.Add(switchAutoPlayText);
+            optionsGrid.Children.Add(switchOpenExplorerText);
+            optionsGrid.Children.Add(switchPreventSleepText);
 
             optionsGrid.Children.Add(switchAutoClose);
             optionsGrid.Children.Add(switchAutoPlay);
             optionsGrid.Children.Add(switchOpenExplorer);
+            optionsGrid.Children.Add(switchPreventSleep);
 
             var optionsTab = new CustomTabItem{
                 Header = "Options",
@@ -992,17 +1027,281 @@ namespace ProgressWindow
         }
     }
 
-    public class CustomSwitch : ButtonBase
+    public sealed class ToggleSwitch : ButtonBase
     {
+        private bool _translating = false;
+        private const double _shrinkScale = 0.9;
+        private const double _ellipseScale = 0.7;
+        private ScaleTransform _scale = new ScaleTransform(_shrinkScale, _shrinkScale);
+        private TranslateTransform _translate = new TranslateTransform();
+
+        public ToggleSwitch()
+        {
+            BorderThickness = new Thickness(1);
+            Background = Brushes.Transparent;
+            Foreground = SystemColors.ControlDarkBrush;
+            BorderBrush = SystemColors.ActiveBorderBrush;
+            HighlightBrush = new SolidColorBrush(new Color { A = 255, R = 72, G = 178, B = 233 });
+
+            TransformGroup tg = new TransformGroup();
+            tg.Children.Add(_scale);
+            tg.Children.Add(_translate);
+
+            EllipseTransformGroup = tg;
+
+            Style = CreateStyle();
+
+            IsVisibleChanged += (s, e) =>
+            {
+                _scale.CenterY = SwitchHeight * _ellipseScale * 0.5;
+                _scale.CenterX = SwitchHeight * _ellipseScale * 0.5;
+
+                if (IsOn)
+                    _translate.X = (SwitchWidth * 0.5) - (SwitchHeight * 0.5);
+                else
+                    _translate.X = (SwitchWidth * -0.5) + (SwitchHeight * 0.5);
+            };
+        }
+
         public bool IsOn
         {
-            get { return (bool)GetValue(CustomSwitch.IsOnProperty); }
-            set { SetValue(CustomSwitch.IsOnProperty, value); }
+            get { return (bool)GetValue(ToggleSwitch.IsOnProperty); }
+            set { SetValue(ToggleSwitch.IsOnProperty, value); }
         }
 
         public static readonly DependencyProperty IsOnProperty =
-            DependencyProperty.Register("IsOn", typeof(bool), typeof(CustomSwitch),
-                                        new PropertyMetadata(false));
+            DependencyProperty.Register("IsOn", typeof(bool), typeof(ToggleSwitch),
+                                        new PropertyMetadata(false, IsOnChanged));
+
+        public Brush HighlightBrush
+        {
+            get { return (Brush)GetValue(ToggleSwitch.HighlightBrushProperty); }
+            set { SetValue(ToggleSwitch.HighlightBrushProperty, value); }
+        }
+
+        public static readonly DependencyProperty HighlightBrushProperty =
+            DependencyProperty.Register("HighlightBrush", typeof(Brush), typeof(ToggleSwitch),
+                                        new PropertyMetadata(SystemColors.HighlightBrush, (d, e) => { ((ToggleSwitch)d).ApplyBackground(); }));
+
+        public Brush ActualBackground
+        {
+            get { return (Brush)GetValue(ToggleSwitch.ActualBackgroundProperty); }
+            set { SetValue(ToggleSwitch.ActualBackgroundProperty, value); }
+        }
+
+        public static readonly DependencyProperty ActualBackgroundProperty =
+            DependencyProperty.Register("ActualBackground", typeof(Brush), typeof(ToggleSwitch),
+                                        new PropertyMetadata(Brushes.Transparent));
+
+        public double SwitchWidth
+        {
+            get { return (double)GetValue(ToggleSwitch.SwitchWidthProperty); }
+            set { SetValue(ToggleSwitch.SwitchWidthProperty, value); }
+        }
+
+        public static readonly DependencyProperty SwitchWidthProperty =
+            DependencyProperty.Register("SwitchWidth", typeof(double), typeof(ToggleSwitch),
+                                        new PropertyMetadata(45.0));
+
+        public double SwitchHeight
+        {
+            get { return (double)GetValue(ToggleSwitch.SwitchHeightProperty); }
+            set { SetValue(ToggleSwitch.SwitchHeightProperty, value); }
+        }
+
+        public static readonly DependencyProperty SwitchHeightProperty =
+            DependencyProperty.Register("SwitchHeight", typeof(double), typeof(ToggleSwitch),
+                                        new PropertyMetadata(23.0));
+
+        private void ApplyBackground()
+        {
+            if (IsOn)
+                ActualBackground = HighlightBrush;
+            else
+                ActualBackground = Background;
+        }
+
+        private static void IsOnChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var source = d as ToggleSwitch;
+            if ((bool)e.OldValue == (bool)e.NewValue || source == null) return;
+
+            source.BeginEllipseTranslateAnimation(0.0, true);
+            source.ApplyBackground();
+        }
+
+        private void BeginEllipseTranslateAnimation(double percent = 0.0, bool important = false)
+        {
+            if (_translating && !important) return;
+            _translating = true;
+
+            if (IsOn)
+            {
+                var anim = new DoubleAnimation
+                {
+                    To = (SwitchWidth * 0.5) - (SwitchHeight * (0.5 + percent)),
+                    Duration = TimeSpan.FromMilliseconds(300),
+                    EasingFunction = new CircleEase
+                    {
+                        EasingMode = EasingMode.EaseOut
+                    }
+                };
+                anim.Completed += (s, e) => { _translating = false; };
+                _translate.BeginAnimation(TranslateTransform.XProperty, anim, HandoffBehavior.SnapshotAndReplace);
+            }
+            else
+            {
+                var anim = new DoubleAnimation
+                {
+                    To = (SwitchWidth * -0.5) + (SwitchHeight * 0.5),
+                    Duration = TimeSpan.FromMilliseconds(300),
+                    EasingFunction = new CircleEase
+                    {
+                        EasingMode = EasingMode.EaseOut
+                    }
+                };
+                anim.Completed += (s, e) => { _translating = false; };
+                _translate.BeginAnimation(TranslateTransform.XProperty, anim, HandoffBehavior.SnapshotAndReplace);
+            }
+        }
+
+        private void BeginEllipseScaleAnimation(double percent = 1.0, int durationMillis = 100, IEasingFunction easing = null, HandoffBehavior handoff = HandoffBehavior.SnapshotAndReplace)
+        {
+            var anim = new DoubleAnimation
+            {
+                To = percent,
+                Duration = TimeSpan.FromMilliseconds(durationMillis),
+                EasingFunction = easing
+            };
+
+            _scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim, handoff);
+            _scale.BeginAnimation(ScaleTransform.ScaleYProperty, anim, handoff);
+        }
+
+        public TransformGroup EllipseTransformGroup
+        {
+            get { return (TransformGroup)GetValue(EllipseTransformGroupProperty); }
+            set { SetValue(EllipseTransformGroupProperty, value); }
+        }
+
+        public static readonly DependencyProperty EllipseTransformGroupProperty =
+            DependencyProperty.Register("EllipseTransformGroup", typeof(TransformGroup), typeof(ToggleSwitch), null);
+
+        protected override void OnMouseEnter(System.Windows.Input.MouseEventArgs e)
+        {
+            BeginEllipseScaleAnimation(1.0);
+            base.OnMouseEnter(e);
+        }
+
+        protected override void OnMouseLeave(System.Windows.Input.MouseEventArgs e)
+        {
+            BeginEllipseScaleAnimation(_shrinkScale, 100, new SineEase { EasingMode = EasingMode.EaseOut });
+            BeginEllipseTranslateAnimation(0.0);
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnMouseDown(System.Windows.Input.MouseButtonEventArgs e)
+        {
+            BeginEllipseScaleAnimation(_shrinkScale * 0.95);
+            BeginEllipseTranslateAnimation(0.1);
+            base.OnMouseDown(e);
+        }
+
+        protected override void OnLostMouseCapture(System.Windows.Input.MouseEventArgs e)
+        {
+            BeginEllipseScaleAnimation(1.0, 200, new ElasticEase { Springiness = 10, Oscillations = 0, EasingMode = EasingMode.EaseIn }, HandoffBehavior.Compose);
+            base.OnLostMouseCapture(e);
+        }
+
+        private static Style CreateStyle()
+        {
+            var ellipse = new FrameworkElementFactory(typeof(Ellipse), "ellipse");
+            ellipse.SetValue(Shape.FillProperty, new TemplateBindingExtension(Control.ForegroundProperty));
+            ellipse.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            ellipse.SetValue(FrameworkElement.HeightProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty)
+            {
+                Converter = MultiplicationValueConverter.I,
+                ConverterParameter = _ellipseScale
+            });
+            ellipse.SetValue(FrameworkElement.WidthProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty)
+            {
+                Converter = MultiplicationValueConverter.I,
+                ConverterParameter = _ellipseScale
+            });
+            ellipse.SetValue(UIElement.RenderTransformProperty, new TemplateBindingExtension(ToggleSwitch.EllipseTransformGroupProperty));
+
+            var overlay = new FrameworkElementFactory(typeof(Border), "overlay");
+            overlay.SetValue(Control.BackgroundProperty, Brushes.Transparent);
+            overlay.SetValue(FrameworkElement.HeightProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty));
+            overlay.SetValue(FrameworkElement.WidthProperty, new TemplateBindingExtension(ToggleSwitch.SwitchWidthProperty));
+            overlay.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+            overlay.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
+            overlay.SetValue(Border.CornerRadiusProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty)
+            {
+                Converter = HightToCornerRadiusConverter.I,
+                ConverterParameter = 0.5
+            });
+
+            var border = new FrameworkElementFactory(typeof(Border), "border");
+            border.SetValue(Control.BackgroundProperty, new TemplateBindingExtension(ToggleSwitch.ActualBackgroundProperty));
+            border.SetValue(FrameworkElement.HeightProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty));
+            border.SetValue(FrameworkElement.WidthProperty, new TemplateBindingExtension(ToggleSwitch.SwitchWidthProperty));
+            border.SetValue(Border.CornerRadiusProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty) {
+                Converter = HightToCornerRadiusConverter.I,
+                ConverterParameter = 0.5
+            });
+
+            var switchArea = new FrameworkElementFactory(typeof(Grid), "switchGrid");
+            switchArea.SetValue(FrameworkElement.MarginProperty, new TemplateBindingExtension(Control.PaddingProperty));
+            switchArea.AppendChild(border);
+            switchArea.AppendChild(overlay);
+            switchArea.AppendChild(ellipse);
+
+            var hitArea = new FrameworkElementFactory(typeof(Border), "hitArea");
+            hitArea.SetValue(Control.BackgroundProperty, Brushes.Transparent);
+
+            var root = new FrameworkElementFactory(typeof(Grid), "TemplateRoot");
+            root.AppendChild(hitArea);
+            root.AppendChild(switchArea);
+
+            var isOnTrigger = new Trigger
+            {
+                Property = ToggleSwitch.IsOnProperty,
+                Value = true,
+            };
+            isOnTrigger.Setters.Add(new Setter(Shape.FillProperty, Brushes.Black, "ellipse"));
+            isOnTrigger.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(0), "overlay"));
+            isOnTrigger.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(0), "border"));
+
+            var mouseOverBrush = new SolidColorBrush(new Color { A = 20, R = 0, G = 0, B = 0 });
+            mouseOverBrush.Freeze();
+
+            var mouseOverTrigger = new Trigger
+            {
+                Property = UIElement.IsMouseOverProperty,
+                Value = true,
+            };
+            mouseOverTrigger.Setters.Add(new Setter(Control.BackgroundProperty, mouseOverBrush, "overlay"));
+
+            var ct = new ControlTemplate(typeof(ButtonBase))
+            {
+                VisualTree = root,
+            };
+            ct.Triggers.Add(isOnTrigger);
+            ct.Triggers.Add(mouseOverTrigger);
+
+            var style = new Style(typeof(ButtonBase));
+            style.Setters.Add(new Setter(Control.TemplateProperty, ct));
+            style.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+            style.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
+            return style;
+        }
+
+        protected override void OnClick()
+        {
+            IsOn = !IsOn;
+            base.OnClick();
+        }
 
         public int GridRow
         {
@@ -1014,129 +1313,6 @@ namespace ProgressWindow
             set { Grid.SetColumn(this, value); }
         }
 
-        private const double SWITCH_ON_X = 30;
-        private const double SWITCH_OFF_X = 11;
-
-        
-        private static DoubleAnimation _switchOnAnimation = new DoubleAnimation{
-            To = SWITCH_ON_X,
-            Duration = new Duration(TimeSpan.FromMilliseconds(150.0))
-        };
-
-        private static DoubleAnimation _switchOffAnimation = new DoubleAnimation{
-            To = SWITCH_OFF_X,
-            Duration = new Duration(TimeSpan.FromMilliseconds(150.0))
-        };
-
-        private static PropertyPath _animationTargetProperty = new PropertyPath(
-            "(0).(1)",
-            UIElement.RenderTransformProperty,
-            TranslateTransform.XProperty
-        );
-
-        public bool RenderWithOn
-        {
-            get { return (bool)GetValue(RenderWithOnProperty); }
-            set { SetValue(RenderWithOnProperty, value); }
-        }
-        public static readonly DependencyProperty RenderWithOnProperty =
-            DependencyProperty.Register("RenderWithOn", typeof(bool), typeof(CustomSwitch),
-                                        new PropertyMetadata(false));
-
-        public CustomSwitch()
-        {
-            Cursor = Cursors.Hand;
-            Style = CreateStyle();
-        }
-
-        protected override void OnRender (DrawingContext drawingContext)
-        {
-            RenderWithOn = IsOn;
-            base.OnRender(drawingContext);
-        }
-
-        private static Style CreateStyle()
-        {
-            var ellipse = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path), "ellipse");
-            ellipse.SetValue(Shape.FillProperty, Theme.switchEllipseBrush);
-            ellipse.SetValue(System.Windows.Shapes.Path.DataProperty, Theme.switchEllipseGeometry);
-            ellipse.SetValue(UIElement.RenderTransformProperty, new TranslateTransform(11, 10));
-            ellipse.SetValue(Grid.ColumnProperty, 1);
-            
-            var outline = new FrameworkElementFactory(typeof(System.Windows.Shapes.Path), "outline");
-            outline.SetValue(Shape.FillProperty, Theme.switchBackgroundBrush);
-            outline.SetValue(Shape.StrokeThicknessProperty, 1.5);
-            outline.SetValue(Shape.StrokeProperty, Theme.switchBorderBrush);
-            outline.SetValue(System.Windows.Shapes.Path.DataProperty, Theme.switchOutlineGeometry);
-            outline.SetValue(Grid.ColumnProperty, 1);
-
-            var content = new FrameworkElementFactory(typeof(ContentPresenter), "content");
-            content.SetValue(Grid.ColumnProperty, 0);
-
-            var column0 = new FrameworkElementFactory(typeof(ColumnDefinition));
-            column0.SetValue(ColumnDefinition.WidthProperty, new GridLength(1.0, GridUnitType.Star));
-
-            var column1 = new FrameworkElementFactory(typeof(ColumnDefinition));
-            column1.SetValue(ColumnDefinition.WidthProperty, GridLength.Auto);
-
-            var root = new FrameworkElementFactory(typeof(Grid), "TemplateRoot");
-            root.AppendChild(column0);
-            root.AppendChild(column1);
-            root.AppendChild(content);
-            root.AppendChild(outline);
-            root.AppendChild(ellipse);
-
-            var renderWithOnTrigger = new Trigger{
-                Property = CustomSwitch.RenderWithOnProperty,
-                Value = true,
-            };
-            renderWithOnTrigger.Setters.Add(new Setter(UIElement.RenderTransformProperty, new TranslateTransform(30, 10), "ellipse"));
-
-            var isOnTrigger = new Trigger{
-                Property = CustomSwitch.IsOnProperty,
-                Value = true,
-            };
-            isOnTrigger.Setters.Add(new Setter(Shape.FillProperty, Theme.switchOnEllipseBrush, "ellipse"));
-            isOnTrigger.Setters.Add(new Setter(Shape.FillProperty, Theme.switchOnBackgroundBrush, "outline"));
-            isOnTrigger.Setters.Add(new Setter(Shape.StrokeProperty, Theme.switchOnBackgroundBrush, "outline"));
-            isOnTrigger.EnterActions.Add(
-                _switchOnAnimation.Clone().ToStoryboard("ellipse", _animationTargetProperty).ToBegin()
-            );
-            isOnTrigger.ExitActions.Add(
-                _switchOffAnimation.Clone().ToStoryboard("ellipse", _animationTargetProperty).ToBegin()
-            );
-
-            var mouseOverTrigger = new Trigger{
-                Property = UIElement.IsMouseOverProperty,
-                Value = true,
-            };
-            mouseOverTrigger.Setters.Add(new Setter(Shape.FillProperty, Theme.switchMouseOverBackgroundBrush, "outline"));
-            mouseOverTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.DataProperty, Theme.switchEllipseMouseOverGeometry, "ellipse"));
-
-            var isOnMouseOverTrigger = new MultiTrigger();
-            isOnMouseOverTrigger.Conditions.Add(new Condition(UIElement.IsMouseOverProperty, true));
-            isOnMouseOverTrigger.Conditions.Add(new Condition(CustomSwitch.IsOnProperty, true));
-            isOnMouseOverTrigger.Setters.Add(new Setter(System.Windows.Shapes.Path.DataProperty, Theme.switchOnEllipseMouseOverGeometry, "ellipse"));
-            isOnMouseOverTrigger.Setters.Add(new Setter(Shape.FillProperty, Theme.switchOnMouseOverBackgroundBrush, "outline"));
-            isOnMouseOverTrigger.Setters.Add(new Setter(Shape.StrokeProperty, Theme.switchOnMouseOverBackgroundBrush, "outline"));
-
-            var ct = new ControlTemplate(typeof(ButtonBase)){
-                VisualTree = root,
-            };
-            ct.Triggers.Add(isOnTrigger);
-            ct.Triggers.Add(mouseOverTrigger);
-            ct.Triggers.Add(isOnMouseOverTrigger);
-            ct.Triggers.Add(renderWithOnTrigger);
-
-            var style = new Style(typeof(ButtonBase));
-            style.Setters.Add(new Setter(Control.TemplateProperty, ct));
-            return style;
-        }
-
-        protected override void OnClick()
-        {
-            IsOn = !IsOn;
-        }
     }
 
     public class CustomTextBlock : TextBlock
@@ -1621,6 +1797,23 @@ namespace ProgressWindow
             set { SetProperty(ref _openExplorerText, value); }
         }
 
+        private bool _preventSleep = false;
+        public bool PreventSleep
+        {
+            get { return _preventSleep; }
+            set {
+                if (SetProperty(ref _preventSleep, value))
+                    ChangeExecutionStateCommand.Execute(value);
+            }
+        }
+
+        private string _preventSleepText = "Prevent PC from going into sleep mode.";
+        public string PreventSleepText
+        {
+            get { return _preventSleepText; }
+            set { SetProperty(ref _preventSleepText, value); }
+        }
+
         private bool _windowTopmost = true;
         public bool WindowTopmost
         {
@@ -1729,6 +1922,13 @@ namespace ProgressWindow
         {
             get { return _openFileCommand; }
             set { SetProperty(ref _openFileCommand, value); }
+        }
+
+        private ICommand _changeExecutionStateCommand;
+        public ICommand ChangeExecutionStateCommand
+        {
+            get { return _changeExecutionStateCommand; }
+            set { SetProperty(ref _changeExecutionStateCommand, value); }
         }
 
         public ProgressViewModel() 
@@ -2074,6 +2274,44 @@ namespace ProgressWindow
         public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {
             return Binding.DoNothing;
+        }
+    }
+
+    [ValueConversion(typeof(double), typeof(CornerRadius))]
+    public class HightToCornerRadiusConverter : IValueConverter
+    {
+        public static HightToCornerRadiusConverter I = new HightToCornerRadiusConverter();
+
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (value is double || parameter is double)
+                return new CornerRadius((double)value * (double)parameter);
+            else
+                throw new ArgumentException();
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotImplementedException("MultiplicationConverter cant convert back");
+        }
+    }
+
+    [ValueConversion(typeof(double), typeof(double))]
+    public class MultiplicationValueConverter : IValueConverter
+    {
+        public static MultiplicationValueConverter I = new MultiplicationValueConverter();
+
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is double || parameter is double)
+                return (double)value * (double)parameter;
+            else
+                throw new ArgumentException();
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            throw new NotImplementedException();
         }
     }
 }
@@ -2564,7 +2802,6 @@ namespace HelperClasses
 
 public static class ConsoleHelper
 {
-
     public static void WriteLine(object message, int beforLines = 0, int afterLines = 0)
     {
         string format = 
@@ -2599,6 +2836,34 @@ public static class ConsoleHelper
         Console.ResetColor();
     }
 }
+
+public class ThreadHelper
+{
+
+    [FlagsAttribute]
+    public enum EXECUTION_STATE :uint
+    {
+        ES_AWAYMODE_REQUIRED = 0x00000040,
+        ES_CONTINUOUS = 0x80000000,
+        ES_DISPLAY_REQUIRED = 0x00000002,
+        ES_SYSTEM_REQUIRED = 0x00000001
+        // Legacy flag, should not be used.
+        // ES_USER_PRESENT = 0x00000004
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Auto,SetLastError = true)]
+    public static extern EXECUTION_STATE SetThreadExecutionState(EXECUTION_STATE esFlags);
+
+    public static void PreventSleep(EXECUTION_STATE state = EXECUTION_STATE.ES_SYSTEM_REQUIRED)
+    {
+        SetThreadExecutionState(EXECUTION_STATE.ES_CONTINUOUS | state);
+    }
+
+    public static void AllowSleep()
+    {
+        SetThreadExecutionState(EXECUTION_STATE.ES_CONTINUOUS);
+    }
+} 
 
 public abstract class ViewModelBase : INotifyPropertyChanged
 {
