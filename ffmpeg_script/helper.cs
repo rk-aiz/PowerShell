@@ -122,6 +122,11 @@ namespace ProgressWindow
         internal static Geometry playGeometry = GetGeometry(
             "m 3.5 15.98 l 0 -11.96 a 1.67 1.67 0 0 1 2.57 -1.39 l 9.3 5.96 a 1.67 1.67 0 0 1 0 2.82 l -9.3 5.96 a 1.67 1.67 0 0 1 -2.57 -1.39 z m 1.67 -11.96 l 0 11.96 l 9.29 -5.98 z"
         );
+
+        internal static Geometry stopGeometry = GetGeometry(
+            "M 3.7 18.75 a 2.45 2.45 0 0 1 -2.45 -2.45 l 0 -12.6 a 2.45 2.45 0 0 1 2.45 -2.45 l 12.6 0 a 2.45 2.45 0 0 1 2.45 2.45 l 0 12.6 a 2.45 2.45 0 0 1 -2.45 2.45 z"
+        );
+
         static Theme()
         {
         }
@@ -204,9 +209,9 @@ namespace ProgressWindow
 
             SetBinding(
                 ProgressStateProxyProperty,
-                new OneWayBinding("ProgressStatus"){
+                new OneWayBinding("ProgressState"){
                     Converter = TaskbarItemProgressStateConverter.I,
-                    ConverterParameter = ProgressStatus.Completed
+                    ConverterParameter = ProgressState.Completed
                 }
             );
             SetBinding(ProgressProxyProperty, new OneWayBinding("Progress"));
@@ -256,18 +261,6 @@ namespace ProgressWindow
             };
             var footer = new CustomFooter();
 
-            var loadingPanel = new LoadingMessage{ GridRowSpan = 2, VerticalAlignment = VerticalAlignment.Top };
-            loadingPanel.SetBinding(Snackbar.RequestVisibleProperty, new OneWayBinding("Busy"));
-
-            var completePanel = new CompleteMessage{ GridRowSpan = 2, VerticalAlignment = VerticalAlignment.Top };
-            completePanel.SetBinding(
-                Snackbar.RequestVisibleProperty,
-                new OneWayBinding("ProgressStatus"){
-                    Converter = EnumToBooleanConverter.I,
-                    ConverterParameter = ProgressStatus.Completed
-                }
-            );
-
             var tabControl = new CustomTabControl{
                 Header = header
             };
@@ -283,8 +276,6 @@ namespace ProgressWindow
 
             visualRoot.Children.Add(tabControl);
             visualRoot.Children.Add(footer);
-            visualRoot.Children.Add(loadingPanel);
-            visualRoot.Children.Add(completePanel);
 
             Content = visualRoot;
         }
@@ -381,6 +372,18 @@ namespace ProgressWindow
 
         private void InitializeComponent()
         {
+            var loadingPanel = new LoadingMessage{ GridRowSpan = 4, VerticalAlignment = VerticalAlignment.Top };
+            loadingPanel.SetBinding(Snackbar.RequestVisibleProperty, new OneWayBinding("Busy"));
+
+            var completePanel = new CompleteMessage{ GridRowSpan = 4, VerticalAlignment = VerticalAlignment.Top };
+            completePanel.SetBinding(
+                Snackbar.RequestVisibleProperty,
+                new OneWayBinding("ProgressState"){
+                    Converter = EnumToBooleanConverter.I,
+                    ConverterParameter = ProgressState.Completed
+                }
+            );
+
             var statusDescription = new CustomTextBlock("StatusDescription"){
                 FontFamily = new FontFamily("Consolas"),
                 GridRow = 3
@@ -392,17 +395,15 @@ namespace ProgressWindow
                 GridRow = 0
             };
 
-            var progressBar = new CustomProgressBar{ GridRow = 1 };
+            var progressBar = new CustomProgressBar();
+            Grid.SetRow(progressBar, 1);
             progressBar.SetBinding(CustomProgressBar.SmoothValueProperty, new OneWayBinding("Progress"));
             progressBar.SetBinding(CustomProgressBar.LabelTextProperty, new OneWayBinding("ProgressLabel"));
             progressBar.SetBinding(
-                CustomProgressBar.IsActiveProperty,
-                new OneWayBinding("ProgressStatus"){
-                    Converter = EnumToBooleanConverter.I,
-                    ConverterParameter = ProgressStatus.Processing
-            });
+                CustomProgressBar.ProgressStateProperty,
+                new TwoWayBinding("ProgressState"));
             progressBar.SetBinding(
-                CustomProgressBar.EnableActiveAnimationProperty,
+                CustomProgressBar.EnableStripeAnimationProperty,
                 new OneWayBinding("EnableActiveAnimation"
             ));
             var remainingText = new CustomTextBlock(
@@ -424,6 +425,8 @@ namespace ProgressWindow
             progressGrid.Children.Add(progressBar);
             progressGrid.Children.Add(remainingText);
             progressGrid.Children.Add(statusDescription);
+            progressGrid.Children.Add(loadingPanel);
+            progressGrid.Children.Add(completePanel);
 
             var progressTab = new CustomTabItem{
                 Header = "Progress",
@@ -621,7 +624,6 @@ namespace ProgressWindow
             style.Setters.Add(new Setter(Control.TemplateProperty, ct));
             style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
             style.Setters.Add(new Setter(Control.ForegroundProperty, Theme.lowlightForegroundBrush));
-            style.Setters.Add(new Setter(Control.ForegroundProperty, Theme.lowlightForegroundBrush));
             return style;
         }
     }
@@ -733,13 +735,13 @@ namespace ProgressWindow
             };
             processControlButton.SetBinding(
                 UIElement.VisibilityProperty,
-                new OneWayBinding("ProgressStatus"){
+                new OneWayBinding("ProgressState"){
                     Converter = EnumToVisibilityConverter.I,
                     ConverterParameter = 1 | 2 | 4
             });
             processControlButton.SetBinding(
                 CustomToggleButton.IsCheckedProperty,
-                new OneWayBinding("ProgressStatus"){
+                new OneWayBinding("ProgressState"){
                     Converter = EnumToBooleanConverter.I,
                     ConverterParameter = 4
             });
@@ -775,9 +777,9 @@ namespace ProgressWindow
 
             openFolderButton.SetBinding(
                 UIElement.VisibilityProperty,
-                new OneWayBinding("ProgressStatus"){
+                new OneWayBinding("ProgressState"){
                     Converter = EnumToVisibilityConverter.I,
-                    ConverterParameter = ProgressStatus.Completed
+                    ConverterParameter = ProgressState.Completed
             });
 
             var cancelButton = new DockPanel{
@@ -997,11 +999,11 @@ namespace ProgressWindow
             Click += (sender, e) => {
                 switch (IsChecked) {
                     case true:
-                        IsChecked = false;
+                        SetCurrentValue(IsCheckedProperty, false);
                         break;
                     case null:
                     case false:
-                        IsChecked = true;
+                        SetCurrentValue(IsCheckedProperty, true);
                         break;
                 }
 
@@ -1029,143 +1031,72 @@ namespace ProgressWindow
 
     public sealed class ToggleSwitch : ButtonBase
     {
-        private bool _translating = false;
-        private const double _shrinkScale = 0.9;
-        private const double _ellipseScale = 0.7;
-        private ScaleTransform _scale = new ScaleTransform(_shrinkScale, _shrinkScale);
-        private TranslateTransform _translate = new TranslateTransform();
+        public int GridRow
+        { set { Grid.SetRow(this, value); } }
+
+        public int GridColumn
+        { set { Grid.SetColumn(this, value); } }
+
+        public int GridRowSpan
+        { set { Grid.SetRowSpan(this, value); } }
+
+        public int GridColumnSpan
+        { set { Grid.SetColumnSpan(this, value); } }
+
+        private const double _ratioOfEllipseRadiusToSwitchHeight = 0.375;
+        private const double _ellipseShrinkScale = 0.95;
+        private ScaleTransform _ellipseScaleTransform = new ScaleTransform(_ellipseShrinkScale, _ellipseShrinkScale);
+        private TranslateTransform _ellipseTranslateTransform = new TranslateTransform();
+
+        // Override dependency properties
+        static ToggleSwitch()
+        {
+            StyleProperty.OverrideMetadata(typeof(ToggleSwitch),
+                new FrameworkPropertyMetadata(CreateStyle()));
+        }
 
         public ToggleSwitch()
         {
-            BorderThickness = new Thickness(1);
-            Background = Brushes.Transparent;
-            Foreground = SystemColors.ControlDarkBrush;
-            BorderBrush = SystemColors.ActiveBorderBrush;
-            HighlightBrush = new SolidColorBrush(new Color { A = 255, R = 72, G = 178, B = 233 });
-
             TransformGroup tg = new TransformGroup();
-            tg.Children.Add(_scale);
-            tg.Children.Add(_translate);
+            tg.Children.Add(_ellipseScaleTransform);
+            tg.Children.Add(_ellipseTranslateTransform);
 
             EllipseTransformGroup = tg;
-
-            Style = CreateStyle();
-
-            IsVisibleChanged += (s, e) =>
-            {
-                _scale.CenterY = SwitchHeight * _ellipseScale * 0.5;
-                _scale.CenterX = SwitchHeight * _ellipseScale * 0.5;
-
-                if (IsOn)
-                    _translate.X = (SwitchWidth * 0.5) - (SwitchHeight * 0.5);
-                else
-                    _translate.X = (SwitchWidth * -0.5) + (SwitchHeight * 0.5);
-            };
         }
 
-        public bool IsOn
+        private void BeginEllipseTranslateAnimation(int duration = 300)
         {
-            get { return (bool)GetValue(ToggleSwitch.IsOnProperty); }
-            set { SetValue(ToggleSwitch.IsOnProperty, value); }
-        }
-
-        public static readonly DependencyProperty IsOnProperty =
-            DependencyProperty.Register("IsOn", typeof(bool), typeof(ToggleSwitch),
-                                        new PropertyMetadata(false, IsOnChanged));
-
-        public Brush HighlightBrush
-        {
-            get { return (Brush)GetValue(ToggleSwitch.HighlightBrushProperty); }
-            set { SetValue(ToggleSwitch.HighlightBrushProperty, value); }
-        }
-
-        public static readonly DependencyProperty HighlightBrushProperty =
-            DependencyProperty.Register("HighlightBrush", typeof(Brush), typeof(ToggleSwitch),
-                                        new PropertyMetadata(SystemColors.HighlightBrush, (d, e) => { ((ToggleSwitch)d).ApplyBackground(); }));
-
-        public Brush ActualBackground
-        {
-            get { return (Brush)GetValue(ToggleSwitch.ActualBackgroundProperty); }
-            set { SetValue(ToggleSwitch.ActualBackgroundProperty, value); }
-        }
-
-        public static readonly DependencyProperty ActualBackgroundProperty =
-            DependencyProperty.Register("ActualBackground", typeof(Brush), typeof(ToggleSwitch),
-                                        new PropertyMetadata(Brushes.Transparent));
-
-        public double SwitchWidth
-        {
-            get { return (double)GetValue(ToggleSwitch.SwitchWidthProperty); }
-            set { SetValue(ToggleSwitch.SwitchWidthProperty, value); }
-        }
-
-        public static readonly DependencyProperty SwitchWidthProperty =
-            DependencyProperty.Register("SwitchWidth", typeof(double), typeof(ToggleSwitch),
-                                        new PropertyMetadata(45.0));
-
-        public double SwitchHeight
-        {
-            get { return (double)GetValue(ToggleSwitch.SwitchHeightProperty); }
-            set { SetValue(ToggleSwitch.SwitchHeightProperty, value); }
-        }
-
-        public static readonly DependencyProperty SwitchHeightProperty =
-            DependencyProperty.Register("SwitchHeight", typeof(double), typeof(ToggleSwitch),
-                                        new PropertyMetadata(23.0));
-
-        private void ApplyBackground()
-        {
-            if (IsOn)
-                ActualBackground = HighlightBrush;
-            else
-                ActualBackground = Background;
-        }
-
-        private static void IsOnChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            var source = d as ToggleSwitch;
-            if ((bool)e.OldValue == (bool)e.NewValue || source == null) return;
-
-            source.BeginEllipseTranslateAnimation(0.0, true);
-            source.ApplyBackground();
-        }
-
-        private void BeginEllipseTranslateAnimation(double percent = 0.0, bool important = false)
-        {
-            if (_translating && !important) return;
-            _translating = true;
-
             if (IsOn)
             {
                 var anim = new DoubleAnimation
                 {
-                    To = (SwitchWidth * 0.5) - (SwitchHeight * (0.5 + percent)),
-                    Duration = TimeSpan.FromMilliseconds(300),
+                    From = (SwitchWidth * -0.5) + (SwitchHeight * 0.5),
+                    To = 0,
+                    Duration = TimeSpan.FromMilliseconds(duration),
                     EasingFunction = new CircleEase
                     {
                         EasingMode = EasingMode.EaseOut
                     }
                 };
-                anim.Completed += (s, e) => { _translating = false; };
-                _translate.BeginAnimation(TranslateTransform.XProperty, anim, HandoffBehavior.SnapshotAndReplace);
+                _ellipseTranslateTransform.BeginAnimation(TranslateTransform.XProperty, anim, HandoffBehavior.SnapshotAndReplace);
             }
             else
             {
                 var anim = new DoubleAnimation
                 {
-                    To = (SwitchWidth * -0.5) + (SwitchHeight * 0.5),
-                    Duration = TimeSpan.FromMilliseconds(300),
+                    From = (SwitchWidth * 0.5) - (SwitchHeight * 0.5),
+                    To = 0,
+                    Duration = TimeSpan.FromMilliseconds(duration),
                     EasingFunction = new CircleEase
                     {
                         EasingMode = EasingMode.EaseOut
                     }
                 };
-                anim.Completed += (s, e) => { _translating = false; };
-                _translate.BeginAnimation(TranslateTransform.XProperty, anim, HandoffBehavior.SnapshotAndReplace);
+                _ellipseTranslateTransform.BeginAnimation(TranslateTransform.XProperty, anim, HandoffBehavior.SnapshotAndReplace);
             }
         }
 
-        private void BeginEllipseScaleAnimation(double percent = 1.0, int durationMillis = 100, IEasingFunction easing = null, HandoffBehavior handoff = HandoffBehavior.SnapshotAndReplace)
+        private void BeginEllipseScaleAnimation(double percent, IEasingFunction easing, int durationMillis = 100, HandoffBehavior handoff = HandoffBehavior.SnapshotAndReplace)
         {
             var anim = new DoubleAnimation
             {
@@ -1174,9 +1105,284 @@ namespace ProgressWindow
                 EasingFunction = easing
             };
 
-            _scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim, handoff);
-            _scale.BeginAnimation(ScaleTransform.ScaleYProperty, anim, handoff);
+            _ellipseScaleTransform.BeginAnimation(ScaleTransform.ScaleXProperty, anim, handoff);
+            _ellipseScaleTransform.BeginAnimation(ScaleTransform.ScaleYProperty, anim, handoff);
         }
+
+        protected override void OnClick()
+        {
+            SetCurrentValue(IsOnProperty, !IsOn);
+            base.OnClick();
+        }
+
+        protected override void OnMouseEnter(System.Windows.Input.MouseEventArgs e)
+        {
+            BeginEllipseScaleAnimation(1.0, new SineEase());
+            base.OnMouseEnter(e);
+        }
+
+        protected override void OnMouseLeave(System.Windows.Input.MouseEventArgs e)
+        {
+            BeginEllipseScaleAnimation(_ellipseShrinkScale, new SineEase { EasingMode = EasingMode.EaseOut });
+            base.OnMouseLeave(e);
+        }
+
+        protected override void OnMouseDown(System.Windows.Input.MouseButtonEventArgs e)
+        {
+            BeginEllipseScaleAnimation(_ellipseShrinkScale, new SineEase(), 0);
+            base.OnMouseDown(e);
+        }
+
+        protected override void OnLostMouseCapture(System.Windows.Input.MouseEventArgs e)
+        {
+            BeginEllipseScaleAnimation(
+                1.0,
+                new ElasticEase { Springiness = 10, Oscillations = 0, EasingMode = EasingMode.EaseIn },
+                200,
+                HandoffBehavior.Compose
+            );
+            base.OnLostMouseCapture(e);
+        }
+
+        private static Style CreateStyle()
+        {
+            var ellipseSizeBinding = new TemplateBindingExtension(SwitchHeightProperty)
+            {
+                Converter = MultiplicationValueConverter.I,
+                ConverterParameter = _ratioOfEllipseRadiusToSwitchHeight * 2
+            };
+            var ellipseRadiusBinding = new TemplateBindingExtension(SwitchHeightProperty)
+            {
+                Converter = MultiplicationValueConverter.I,
+                ConverterParameter = _ratioOfEllipseRadiusToSwitchHeight
+            };
+
+            var ellipse = new FrameworkElementFactory(typeof(Rectangle), "ellipse");
+            ellipse.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
+            ellipse.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Left);
+            ellipse.SetValue(HeightProperty, ellipseSizeBinding);
+            ellipse.SetValue(WidthProperty, ellipseSizeBinding);
+            ellipse.SetValue(MarginProperty, new TemplateBindingExtension(SwitchHeightProperty){
+                Converter = DoubleToThicknessConverter.I,
+                ConverterParameter = 0.5 - _ratioOfEllipseRadiusToSwitchHeight 
+            });
+            ellipse.SetValue(Shape.FillProperty, new TemplateBindingExtension(ForegroundProperty));
+            ellipse.SetValue(Rectangle.RadiusXProperty, ellipseRadiusBinding);
+            ellipse.SetValue(Rectangle.RadiusYProperty, ellipseRadiusBinding);
+            ellipse.SetValue(RenderTransformProperty, new TemplateBindingExtension(EllipseTransformGroupProperty));
+            ellipse.SetValue(RenderTransformOriginProperty, new Point(0.5, 0.5));
+
+            var radiusBinding = new Binding("SwitchHeight")
+            {
+                RelativeSource = RelativeSource.TemplatedParent,
+                Converter = MultiplicationValueConverter.I,
+                ConverterParameter = 0.5
+            };
+            var heightBinding = new Binding("SwitchHeight") { RelativeSource = RelativeSource.TemplatedParent };
+            var widthBinding = new TemplateBindingExtension(SwitchWidthProperty);
+
+            #region backgroundElement
+
+            var background = new FrameworkElementFactory(typeof(Rectangle), "background");
+
+            // Countermeasure against background color overflowing outside the border
+            var backgroundPaddingBinding = new Binding("BorderThickness")
+            {
+                RelativeSource = RelativeSource.TemplatedParent,
+                Converter = ThicknessToDoubleConverter.I, ConverterParameter = 0.2
+            };
+
+            // This multi-binding derives the radius from the border thickness and switch height
+            var backgroundRadius = new MultiBinding
+            {
+                Converter = BorderRadiusConverter.I,
+                ConverterParameter = 0.5
+            };
+            backgroundRadius.Bindings.Add(heightBinding);
+            backgroundRadius.Bindings.Add(backgroundPaddingBinding);
+
+            var backgroundBinding = new Binding("Background") { RelativeSource = RelativeSource.TemplatedParent };
+
+            background.SetValue(HeightProperty, heightBinding);
+            background.SetValue(WidthProperty, widthBinding);
+            background.SetValue(Shape.FillProperty, backgroundBinding);
+            background.SetValue(Shape.StrokeThicknessProperty, backgroundPaddingBinding);
+            background.SetValue(Shape.StrokeProperty, Brushes.Transparent);
+            background.SetValue(Rectangle.RadiusXProperty, backgroundRadius);
+            background.SetValue(Rectangle.RadiusYProperty, backgroundRadius);
+
+            #endregion
+
+            var highlight = new FrameworkElementFactory(typeof(Rectangle), "highlight");
+            highlight.SetValue(VisibilityProperty, Visibility.Collapsed);
+            highlight.SetValue(HeightProperty, heightBinding);
+            highlight.SetValue(WidthProperty, widthBinding);
+            highlight.SetValue(Shape.FillProperty, new TemplateBindingExtension(HighlightBrushProperty));
+            highlight.SetValue(Rectangle.RadiusXProperty, radiusBinding);
+            highlight.SetValue(Rectangle.RadiusYProperty, radiusBinding);
+
+            #region borderElement
+
+            var border = new FrameworkElementFactory(typeof(Rectangle), "border");
+
+            var borderThicknessBinding = new Binding("BorderThickness")
+            {
+                RelativeSource = RelativeSource.TemplatedParent,
+                Converter = ThicknessToDoubleConverter.I,
+            };
+
+            // This multi-binding derives the radius from the border thickness and switch height
+            var borderRadiusBinding = new MultiBinding
+            { 
+                Converter = BorderRadiusConverter.I,
+                ConverterParameter = 0.5
+            };
+            borderRadiusBinding.Bindings.Add(heightBinding);
+            borderRadiusBinding.Bindings.Add(borderThicknessBinding);
+
+            border.SetValue(HeightProperty, heightBinding);
+            border.SetValue(WidthProperty, widthBinding);
+            border.SetValue(Shape.FillProperty, Brushes.Transparent);
+            border.SetValue(Shape.StrokeProperty, new TemplateBindingExtension(BorderBrushProperty));
+            border.SetValue(Shape.StrokeThicknessProperty, borderThicknessBinding);
+            border.SetValue(Rectangle.RadiusXProperty, borderRadiusBinding);
+            border.SetValue(Rectangle.RadiusYProperty, borderRadiusBinding);
+
+            #endregion
+
+            var switchArea = new FrameworkElementFactory(typeof(Grid), "switchGrid");
+            switchArea.SetValue(MinHeightProperty, heightBinding); 
+            switchArea.SetValue(MarginProperty, new TemplateBindingExtension(PaddingProperty));
+            switchArea.AppendChild(background);
+            switchArea.AppendChild(highlight);
+            switchArea.AppendChild(border);
+            switchArea.AppendChild(ellipse);
+
+            var hitArea = new FrameworkElementFactory(typeof(Border), "hitArea");
+            hitArea.SetValue(BackgroundProperty, Brushes.Transparent);
+
+            var root = new FrameworkElementFactory(typeof(Grid), "TemplateRoot");
+            root.AppendChild(hitArea);
+            root.AppendChild(switchArea);
+
+            var isOnTrigger = new Trigger
+            {
+                Property = IsOnProperty,
+                Value = true,
+            };
+            isOnTrigger.Setters.Add(new Setter(HorizontalAlignmentProperty, HorizontalAlignment.Right, "ellipse"));
+            isOnTrigger.Setters.Add(new Setter(Shape.FillProperty, Brushes.Black, "ellipse"));
+            isOnTrigger.Setters.Add(new Setter(VisibilityProperty, Visibility.Collapsed, "background"));
+            isOnTrigger.Setters.Add(new Setter(Shape.StrokeProperty, backgroundBinding, "background"));
+            isOnTrigger.Setters.Add(new Setter(VisibilityProperty, Visibility.Visible, "highlight"));
+            isOnTrigger.Setters.Add(new Setter(Shape.StrokeThicknessProperty, 0.0, "border"));
+            isOnTrigger.Setters.Add(new Setter(Rectangle.RadiusXProperty, radiusBinding, "border"));
+            isOnTrigger.Setters.Add(new Setter(Rectangle.RadiusYProperty, radiusBinding, "border"));
+
+            var mouseOverBrush = new SolidColorBrush(new Color { A = 30, R = 0, G = 0, B = 0 });
+            mouseOverBrush.Freeze();
+
+            var mouseOverTrigger = new Trigger
+            {
+                Property = IsMouseOverProperty,
+                Value = true,
+            };
+            mouseOverTrigger.Setters.Add(new Setter(Shape.FillProperty, mouseOverBrush, "border"));
+
+            var ellipsePressedWidthBinding = new Binding("SwitchHeight")
+            {
+                Mode = BindingMode.OneWay,
+                RelativeSource = RelativeSource.TemplatedParent,
+                Converter = MultiplicationValueConverter.I,
+                ConverterParameter = _ratioOfEllipseRadiusToSwitchHeight * 2.4
+            };
+
+            var pressedTrigger = new Trigger
+            {
+                Property = IsPressedProperty,
+                Value = true,
+            };
+            pressedTrigger.Setters.Add(new Setter(WidthProperty, ellipsePressedWidthBinding, "ellipse"));
+
+            var disabledTrigger = new Trigger
+            {
+                Property = IsEnabledProperty,
+                Value = false,
+            };
+            disabledTrigger.Setters.Add(new Setter(OpacityProperty, 0.35));
+
+            var ct = new ControlTemplate(typeof(ButtonBase))
+            {
+                VisualTree = root,
+            };
+            ct.Triggers.Add(isOnTrigger);
+            ct.Triggers.Add(mouseOverTrigger);
+            ct.Triggers.Add(pressedTrigger);
+            ct.Triggers.Add(disabledTrigger);
+
+            var style = new Style(typeof(ButtonBase));
+            style.Setters.Add(new Setter(TemplateProperty, ct));
+            style.Setters.Add(new Setter(HorizontalAlignmentProperty, HorizontalAlignment.Center));
+            style.Setters.Add(new Setter(VerticalAlignmentProperty, VerticalAlignment.Center));
+            style.Setters.Add(new Setter(BorderThicknessProperty, new Thickness(1)));
+            style.Setters.Add(new Setter(BackgroundProperty, Brushes.Transparent));
+            style.Setters.Add(new Setter(ForegroundProperty, SystemColors.ControlDarkBrush));
+            style.Setters.Add(new Setter(BorderBrushProperty, SystemColors.ActiveBorderBrush));
+            return style;
+        }
+
+        /**
+         * Dependency property changed callback(s)
+         */
+        private static void IsOnChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            if ((bool)e.OldValue == (bool)e.NewValue) return;
+            var source = (ToggleSwitch)d;
+            source.BeginEllipseTranslateAnimation();
+        }
+
+        /**
+         * Dependency properties
+         */
+        public bool IsOn
+        {
+            get { return (bool)GetValue(IsOnProperty); }
+            set { SetValue(IsOnProperty, value); }
+        }
+
+        public static readonly DependencyProperty IsOnProperty =
+            DependencyProperty.Register("IsOn",
+                typeof(bool), typeof(ToggleSwitch), new PropertyMetadata(false, IsOnChanged));
+
+        public Brush HighlightBrush
+        {
+            get { return (Brush)GetValue(HighlightBrushProperty); }
+            set { SetValue(HighlightBrushProperty, value); }
+        }
+
+        public static readonly DependencyProperty HighlightBrushProperty =
+            DependencyProperty.Register("HighlightBrush",
+                typeof(Brush), typeof(ToggleSwitch), new PropertyMetadata(new SolidColorBrush(new Color { A = 255, R = 70, G = 160, B = 255 })));
+
+        public double SwitchWidth
+        {
+            get { return (double)GetValue(SwitchWidthProperty); }
+            set { SetValue(SwitchWidthProperty, value); }
+        }
+
+        public static readonly DependencyProperty SwitchWidthProperty =
+            DependencyProperty.Register("SwitchWidth",
+                typeof(double), typeof(ToggleSwitch), new PropertyMetadata(40.0));
+
+        public double SwitchHeight
+        {
+            get { return (double)GetValue(SwitchHeightProperty); }
+            set { SetValue(SwitchHeightProperty, value); }
+        }
+
+        public static readonly DependencyProperty SwitchHeightProperty =
+            DependencyProperty.Register("SwitchHeight",
+                typeof(double), typeof(ToggleSwitch), new PropertyMetadata(20.0));
 
         public TransformGroup EllipseTransformGroup
         {
@@ -1187,132 +1393,97 @@ namespace ProgressWindow
         public static readonly DependencyProperty EllipseTransformGroupProperty =
             DependencyProperty.Register("EllipseTransformGroup", typeof(TransformGroup), typeof(ToggleSwitch), null);
 
-        protected override void OnMouseEnter(System.Windows.Input.MouseEventArgs e)
-        {
-            BeginEllipseScaleAnimation(1.0);
-            base.OnMouseEnter(e);
-        }
 
-        protected override void OnMouseLeave(System.Windows.Input.MouseEventArgs e)
+        [ValueConversion(typeof(double), typeof(Thickness))]
+        private class DoubleToThicknessConverter : IValueConverter
         {
-            BeginEllipseScaleAnimation(_shrinkScale, 100, new SineEase { EasingMode = EasingMode.EaseOut });
-            BeginEllipseTranslateAnimation(0.0);
-            base.OnMouseLeave(e);
-        }
+            public static DoubleToThicknessConverter I = new DoubleToThicknessConverter();
 
-        protected override void OnMouseDown(System.Windows.Input.MouseButtonEventArgs e)
-        {
-            BeginEllipseScaleAnimation(_shrinkScale * 0.95);
-            BeginEllipseTranslateAnimation(0.1);
-            base.OnMouseDown(e);
-        }
-
-        protected override void OnLostMouseCapture(System.Windows.Input.MouseEventArgs e)
-        {
-            BeginEllipseScaleAnimation(1.0, 200, new ElasticEase { Springiness = 10, Oscillations = 0, EasingMode = EasingMode.EaseIn }, HandoffBehavior.Compose);
-            base.OnLostMouseCapture(e);
-        }
-
-        private static Style CreateStyle()
-        {
-            var ellipse = new FrameworkElementFactory(typeof(Ellipse), "ellipse");
-            ellipse.SetValue(Shape.FillProperty, new TemplateBindingExtension(Control.ForegroundProperty));
-            ellipse.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-            ellipse.SetValue(FrameworkElement.HeightProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty)
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
             {
-                Converter = MultiplicationValueConverter.I,
-                ConverterParameter = _ellipseScale
-            });
-            ellipse.SetValue(FrameworkElement.WidthProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty)
+                if (value is double || parameter is double)
+                    return new Thickness((double)value * (double)parameter);
+                else
+                    throw new ArgumentException();
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
             {
-                Converter = MultiplicationValueConverter.I,
-                ConverterParameter = _ellipseScale
-            });
-            ellipse.SetValue(UIElement.RenderTransformProperty, new TemplateBindingExtension(ToggleSwitch.EllipseTransformGroupProperty));
-
-            var overlay = new FrameworkElementFactory(typeof(Border), "overlay");
-            overlay.SetValue(Control.BackgroundProperty, Brushes.Transparent);
-            overlay.SetValue(FrameworkElement.HeightProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty));
-            overlay.SetValue(FrameworkElement.WidthProperty, new TemplateBindingExtension(ToggleSwitch.SwitchWidthProperty));
-            overlay.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
-            overlay.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
-            overlay.SetValue(Border.CornerRadiusProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty)
-            {
-                Converter = HightToCornerRadiusConverter.I,
-                ConverterParameter = 0.5
-            });
-
-            var border = new FrameworkElementFactory(typeof(Border), "border");
-            border.SetValue(Control.BackgroundProperty, new TemplateBindingExtension(ToggleSwitch.ActualBackgroundProperty));
-            border.SetValue(FrameworkElement.HeightProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty));
-            border.SetValue(FrameworkElement.WidthProperty, new TemplateBindingExtension(ToggleSwitch.SwitchWidthProperty));
-            border.SetValue(Border.CornerRadiusProperty, new TemplateBindingExtension(ToggleSwitch.SwitchHeightProperty) {
-                Converter = HightToCornerRadiusConverter.I,
-                ConverterParameter = 0.5
-            });
-
-            var switchArea = new FrameworkElementFactory(typeof(Grid), "switchGrid");
-            switchArea.SetValue(FrameworkElement.MarginProperty, new TemplateBindingExtension(Control.PaddingProperty));
-            switchArea.AppendChild(border);
-            switchArea.AppendChild(overlay);
-            switchArea.AppendChild(ellipse);
-
-            var hitArea = new FrameworkElementFactory(typeof(Border), "hitArea");
-            hitArea.SetValue(Control.BackgroundProperty, Brushes.Transparent);
-
-            var root = new FrameworkElementFactory(typeof(Grid), "TemplateRoot");
-            root.AppendChild(hitArea);
-            root.AppendChild(switchArea);
-
-            var isOnTrigger = new Trigger
-            {
-                Property = ToggleSwitch.IsOnProperty,
-                Value = true,
-            };
-            isOnTrigger.Setters.Add(new Setter(Shape.FillProperty, Brushes.Black, "ellipse"));
-            isOnTrigger.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(0), "overlay"));
-            isOnTrigger.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(0), "border"));
-
-            var mouseOverBrush = new SolidColorBrush(new Color { A = 20, R = 0, G = 0, B = 0 });
-            mouseOverBrush.Freeze();
-
-            var mouseOverTrigger = new Trigger
-            {
-                Property = UIElement.IsMouseOverProperty,
-                Value = true,
-            };
-            mouseOverTrigger.Setters.Add(new Setter(Control.BackgroundProperty, mouseOverBrush, "overlay"));
-
-            var ct = new ControlTemplate(typeof(ButtonBase))
-            {
-                VisualTree = root,
-            };
-            ct.Triggers.Add(isOnTrigger);
-            ct.Triggers.Add(mouseOverTrigger);
-
-            var style = new Style(typeof(ButtonBase));
-            style.Setters.Add(new Setter(Control.TemplateProperty, ct));
-            style.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center));
-            style.Setters.Add(new Setter(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center));
-            return style;
+                throw new NotImplementedException();
+            }
         }
 
-        protected override void OnClick()
+        [ValueConversion(typeof(double), typeof(Thickness))]
+        private class ThicknessToDoubleConverter : IValueConverter
         {
-            IsOn = !IsOn;
-            base.OnClick();
+            public static ThicknessToDoubleConverter I = new ThicknessToDoubleConverter();
+
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is Thickness)
+                {
+                    double param;
+                    if (parameter is double)
+                        param = (double)parameter;
+                    else
+                        param = 1.0;
+
+                    var thickness = (Thickness)value;
+                    return (thickness.Left + thickness.Right + thickness.Top + thickness.Bottom) * 0.25 * param;
+                }
+                else
+                    throw new ArgumentException();
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
         }
 
-        public int GridRow
+        [ValueConversion(typeof(double), typeof(double))]
+        private class MultiplicationValueConverter : IValueConverter
         {
-            set { Grid.SetRow(this, value); }
+            public static MultiplicationValueConverter I = new MultiplicationValueConverter();
+
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            {
+                if (value is double || parameter is double)
+                    return (double)value * (double)parameter;
+                else
+                    throw new ArgumentException();
+            }
+
+            public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
         }
 
-        public int GridColumn
+        private class BorderRadiusConverter : IMultiValueConverter
         {
-            set { Grid.SetColumn(this, value); }
-        }
+            public static BorderRadiusConverter I = new BorderRadiusConverter();
+            public object Convert(object[] value, Type type, object parameter, CultureInfo culture)
+            {
+                if (value.Count() != 2 || !(parameter is double)) throw new ArgumentException();
 
+                double result;
+                try
+                {
+                    var height = (double)value[0];
+                    var thickness = (double)value[1];
+                    result = (height * (double)parameter) - (thickness * 0.5);
+                } catch { 
+                    throw new ArgumentException();
+                }
+                return result;
+            }
+
+            public object[] ConvertBack(object value, Type[] type, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
+            }
+        }
     }
 
     public class CustomTextBlock : TextBlock
@@ -1437,7 +1608,7 @@ namespace ProgressWindow
 
             var enterAnimation = new DoubleAnimation{
                 Duration = TimeSpan.FromMilliseconds(500),
-                To = 40,
+                To = 0,
                 EasingFunction = new QuarticEase{ EasingMode = EasingMode.EaseOut },
             };
             _visibleStoryboard = enterAnimation.ToStoryboard(this, positionPropertyPath);
@@ -1505,7 +1676,45 @@ namespace ProgressWindow
     {
         public LoadingMessage()
         {
-            Header = new CustomSpinner();
+            var pauseIcon = new System.Windows.Shapes.Path{
+                Data = Theme.suspendGeometry,
+                Fill = Theme.foregroundBrush,
+                Width = 14,
+                Height = 14,
+                Stretch = Stretch.Uniform
+            };
+            pauseIcon.SetBinding(VisibilityProperty, new Binding("ProgressState"){
+                Converter = EnumToVisibilityConverter.I,
+                ConverterParameter = 1 | 4
+            });
+            var resumeIcon = new System.Windows.Shapes.Path{
+                Data = Theme.resumeGeometry,
+                Fill = Theme.highlightForegroundBrush,
+                Width = 14,
+                Height = 14,
+                Stretch = Stretch.Uniform
+            };
+            resumeIcon.SetBinding(VisibilityProperty, new Binding("ProgressState"){
+                Converter = EnumToVisibilityConverter.I,
+                ConverterParameter = 2 | 8
+            });
+            var stopIcon = new System.Windows.Shapes.Path{
+                Data = Theme.stopGeometry,
+                Fill = Theme.foregroundBrush,
+                Width = 12,
+                Height = 12,
+                Stretch = Stretch.Uniform
+            };
+            stopIcon.SetBinding(VisibilityProperty, new Binding("ProgressState"){
+                Converter = EnumToVisibilityConverter.I,
+                ConverterParameter = 16
+            });
+            var header = new StackPanel();
+            header.Children.Add(pauseIcon);
+            header.Children.Add(resumeIcon);
+            header.Children.Add(stopIcon);
+
+            Header = header;
             Content =  new CustomTextBlock("BusyMessage"){ FontFamily = SystemFonts.MessageFontFamily };
         }
     }
@@ -1710,12 +1919,12 @@ namespace ProgressWindow
             }
         }
 
-        private ProgressStatus _progressStatus = ProgressStatus.Initialize;
-        public ProgressStatus ProgressStatus
+        private ProgressState _ProgressState = ProgressState.Indeterminate;
+        public ProgressState ProgressState
         {
-            get { return _progressStatus; }
+            get { return _ProgressState; }
             set {
-                SetProperty(ref _progressStatus, value);
+                SetProperty(ref _ProgressState, value);
             }
         }
 
@@ -1935,9 +2144,463 @@ namespace ProgressWindow
         { }
     }
 
-    public class CustomProgressBar : ProgressBar
+    [Flags]
+    public enum ProgressState
     {
-        private bool _smoothValueActive = false;
+        Indeterminate = 1,
+        Normal = 2,
+        Paused = 4,
+        Completed = 8,
+        None = 16,
+    }
+
+    [TemplatePart(Name = "PART_Track", Type = typeof(FrameworkElement))]
+    [TemplatePart(Name = "PART_Indicator", Type = typeof(FrameworkElement))]
+    [TemplatePart(Name = "PART_GlowRect", Type = typeof(FrameworkElement))]
+    [TemplatePart(Name = "PART_Stripe", Type = typeof(FrameworkElement))]
+    public sealed class CustomProgressBar : RangeBase
+    {
+        #region Data
+
+        private const string TrackTemplateName = "PART_Track";
+        private const string IndicatorTemplateName = "PART_Indicator";
+        private const string GlowingRectTemplateName = "PART_GlowRect";
+        private const string StripeTemplateName = "PART_Stripe";
+
+        private TranslateTransform _glowTransform = new TranslateTransform();
+        private TranslateTransform _stripeTransform = new TranslateTransform();
+        private ScaleTransform _indicatorTransform = new ScaleTransform(0, 1);
+
+        private static Geometry _stripeGeometry = PathGeometry.Parse(
+            "M 40 0 L 40 20 L 20 40 L 0 40 Z M 0 0 L 20 0 L 0 20 Z");
+        private static DoubleAnimationBase _stripeAnimation;
+        private AnimationClock _stripeAnimationClock;
+
+        private static DoubleAnimationBase _completedAnimation;
+
+        private FrameworkElement _track; // Currently not needed.
+        private FrameworkElement _indicator;
+        private FrameworkElement _glow;
+        private FrameworkElement _stripe;
+
+        #endregion Data
+
+        #region Constructor
+
+        // Override dependency properties
+        static CustomProgressBar()
+        {
+            FocusableProperty.OverrideMetadata(typeof(CustomProgressBar), new FrameworkPropertyMetadata(false));
+
+            // Set default to 100.0
+            MaximumProperty.OverrideMetadata(typeof(CustomProgressBar), new FrameworkPropertyMetadata(100.0));
+
+            // Set initial value of Foreground. Changing [Foreground] triggers re-creation of a glow brush.
+            ForegroundProperty.OverrideMetadata(typeof(CustomProgressBar), new FrameworkPropertyMetadata(
+                new SolidColorBrush(Color.FromArgb(255, 1, 140, 200)),
+                (d, e) => { ((CustomProgressBar)d).SetGlowElementBrush(); }
+            ){
+                Inherits = false
+            });
+
+            // Set initial value of Background. Changing [Background] triggers re-creation of a stripe brush.
+            BackgroundProperty.OverrideMetadata(typeof(CustomProgressBar), new FrameworkPropertyMetadata(
+                new SolidColorBrush(Color.FromArgb(25, 127, 127, 127)),
+                (d, e) => { ((CustomProgressBar)d).SetStripeElementBrush(); }
+            ));
+
+            BorderBrushProperty.OverrideMetadata(typeof(CustomProgressBar), new FrameworkPropertyMetadata(
+                new SolidColorBrush(Color.FromArgb(255, 1, 90, 170))
+            ));
+
+            StyleProperty.OverrideMetadata(typeof(CustomProgressBar),
+                new FrameworkPropertyMetadata(CreateStyle()));
+
+            _stripeAnimation = new DoubleAnimation
+            {
+                From = 0.0,
+                To = 40,
+                Duration = new Duration(TimeSpan.FromMilliseconds(500)),
+                FillBehavior = FillBehavior.HoldEnd,
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+
+            var anim = new DoubleAnimationUsingKeyFrames
+            {
+                Duration = TimeSpan.FromMilliseconds(1000),
+            };
+            anim.KeyFrames.Add(new DiscreteDoubleKeyFrame(0,
+                KeyTime.FromTimeSpan(TimeSpan.FromSeconds(0)))
+            );
+            anim.KeyFrames.Add(new SplineDoubleKeyFrame(1,
+                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(300)))
+            );
+            anim.KeyFrames.Add(new DiscreteDoubleKeyFrame(1,
+                KeyTime.FromTimeSpan(TimeSpan.FromSeconds(600)))
+            );
+            anim.KeyFrames.Add(new SplineDoubleKeyFrame(0.35,
+                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1000)))
+            );
+            _completedAnimation = anim;
+        }
+
+        public CustomProgressBar()
+        {
+            Margin = new Thickness { Left = 20, Right = 20 };
+            VerticalAlignment = VerticalAlignment.Center;
+
+            IsVisibleChanged += (s, e) => { UpdateAnimation(); };
+            Loaded += (s, e) => {
+                UpdateIndicator();
+                UpdateAnimation();
+            };
+
+            // Prepare animation clock and controller
+            _stripeAnimationClock = _stripeAnimation.CreateClock();
+            _stripeTransform.ApplyAnimationClock(TranslateTransform.XProperty, _stripeAnimationClock, HandoffBehavior.Compose);
+        }
+
+        #endregion Constructor
+
+        #region Feature
+
+        protected override void OnValueChanged(double oldValue, double newValue)
+        {
+            base.OnValueChanged(oldValue, newValue);
+
+            if (newValue == 100.0)
+            {
+                SetCurrentValue(ProgressStateProperty, ProgressState.Completed);
+            }
+
+            UpdateIndicator();
+        }
+
+        // Set the width of the indicator
+        private void UpdateIndicator()
+        {
+            if (_indicatorTransform != null)
+            {
+                double min = Minimum;
+                double max = Maximum;
+                double val = Value;
+
+                // When maximum == minimum, have the indicator stretch the
+                // whole length of track 
+                double scale = max == min ? 1.0 : (val - min) / (max - min);
+
+                _indicatorTransform.ScaleX = scale;
+            }
+        }
+
+        // Switch the required animation state according to changes in [ProgressState]
+        private static void ProgressStateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            CustomProgressBar source = (CustomProgressBar)d;
+
+            source.SetGlowElementBrush();
+            source.UpdateAnimation();
+            source.UpdateCompletedBrush();
+        }
+
+        private void UpdateCompletedBrush()
+        {
+            // CompletedBrush fade-in animation
+            if (_glow != null)
+            {
+                if (ProgressState == ProgressState.Completed)
+                {
+                    _glow.BeginAnimation(OpacityProperty, _completedAnimation);
+                }
+                else
+                {
+                    _glow.BeginAnimation(OpacityProperty, null);
+                    _glow.Opacity = 1;
+                }
+            }
+        }
+
+        private void UpdateAnimation()
+        {
+            UpdateStripeAnimation();
+            UpdateIndeterminateAnimation();
+        }
+
+        private bool _glowAnimating = false;
+        private void UpdateIndeterminateAnimation(bool force = false)
+        {
+            if (_glowTransform == null || ActualWidth == 0) return;
+
+            if (!force && _glowAnimating) return;
+
+            if (IsVisible && IsIndeterminate)
+            {
+                _glowAnimating = true;
+                var anim = new DoubleAnimation
+                {
+                    From = ActualWidth * -1,
+                    To = ActualWidth * 2,
+                    Duration = TimeSpan.FromMilliseconds(2000),
+                };
+                anim.Completed += (s, e) => {
+                    UpdateIndeterminateAnimation(true);
+                };
+                _glowTransform.BeginAnimation(TranslateTransform.XProperty, anim, HandoffBehavior.SnapshotAndReplace);
+            }
+            else
+            {
+                _glowAnimating = false;
+                _glowTransform.BeginAnimation(TranslateTransform.XProperty, null);
+            }
+        }
+
+        private void UpdateStripeAnimation()
+        {
+            if (ProgressState == ProgressState.Normal && EnableStripeAnimation)
+            {
+                if (_stripeAnimationClock.IsPaused)
+                    _stripeAnimationClock.Controller.Resume();
+                else
+                    _stripeAnimationClock.Controller.Begin();
+            }
+            else if (!_stripeAnimationClock.IsPaused)
+            {
+                _stripeAnimationClock.Controller.Pause();
+            }
+        }
+
+        private void AnimateSmoothValue(double value)
+        {
+            var anim = new DoubleAnimation(value, TimeSpan.FromMilliseconds(500));
+            BeginAnimation(ValueProperty, anim, HandoffBehavior.Compose);
+        }
+
+        // This is used to set the correct brush/opacity mask on the indicator. 
+        private void SetGlowElementBrush()
+        {
+            if (_glow == null || !IsIndeterminate)
+                return;
+
+            _glow.InvalidateProperty(UIElement.OpacityMaskProperty);
+            _glow.InvalidateProperty(Shape.FillProperty);
+
+            if (Foreground is SolidColorBrush)
+            {
+                // Create the glow brush based on [Foreground]
+                Color color = ((SolidColorBrush)this.Foreground).Color;
+                var brush = new LinearGradientBrush
+                {
+                    StartPoint = new Point(0, 0),
+                    EndPoint = new Point(1, 0),
+                    MappingMode = BrushMappingMode.RelativeToBoundingBox,
+                    Transform = _glowTransform,
+                    RelativeTransform = new ScaleTransform(1.0, 1.0)
+                };
+
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, color.R, color.G, color.B), 0.0));
+                brush.GradientStops.Add(new GradientStop(color, 0.4));
+                brush.GradientStops.Add(new GradientStop(color, 0.6));
+                brush.GradientStops.Add(new GradientStop(Color.FromArgb(0, color.R, color.G, color.B), 1.0));
+                _glow.SetCurrentValue(Shape.FillProperty, brush);
+            }
+            else
+            {
+                // Foreground is not a SolidColorBrush, use an opacity mask. 
+                LinearGradientBrush mask = new LinearGradientBrush
+                {
+                    StartPoint = new Point(0, 0),
+                    EndPoint = new Point(1, 0),
+                    MappingMode = BrushMappingMode.RelativeToBoundingBox,
+                    Transform = _glowTransform,
+                    RelativeTransform = new ScaleTransform(1.0, 1.0)
+                };
+                mask.GradientStops.Add(new GradientStop(Colors.Transparent, 0.0));
+                mask.GradientStops.Add(new GradientStop(Colors.Black, 0.4));
+                mask.GradientStops.Add(new GradientStop(Colors.Black, 0.6));
+                mask.GradientStops.Add(new GradientStop(Colors.Transparent, 1.0));
+                _glow.SetCurrentValue(UIElement.OpacityMaskProperty, mask);
+                _glow.SetCurrentValue(Shape.FillProperty, this.Foreground);
+            }
+        }
+
+        // This is used to set the correct brush/opacity mask on the stripe. 
+        private void SetStripeElementBrush()
+        {
+            if (_stripe == null)
+                return;
+
+            _stripe.InvalidateProperty(UIElement.OpacityMaskProperty);
+            _stripe.InvalidateProperty(Shape.FillProperty);
+
+            var geometryDrawing = new GeometryDrawing
+            {
+                Geometry = _stripeGeometry
+            };
+
+            if (Background is SolidColorBrush)
+            {
+                // Create the stripe brush based on [Background]
+                Color basis = ((SolidColorBrush)Background).Color;
+                Color color;
+                if (basis.R + basis.G + basis.B > 383)
+                    color = Color.FromArgb(basis.A, (byte)(basis.R * 0.9), (byte)(basis.G * 0.9), (byte)(basis.B * 0.9));
+                else
+                    color = Color.FromArgb(basis.A, (byte)(basis.R * 1.1), (byte)(basis.G * 1.1), (byte)(basis.B * 1.1));
+
+                geometryDrawing.Brush = new SolidColorBrush(color);
+            }
+            else
+            {
+                geometryDrawing.Brush = new SolidColorBrush(Color.FromArgb(25, 0, 0, 0));
+            }
+
+            var stripeBrush = new DrawingBrush
+            {
+                TileMode = TileMode.Tile,
+                Stretch = Stretch.None,
+                Viewport = new Rect(0, 0, 40, 40),
+                ViewportUnits = BrushMappingMode.Absolute,
+                Transform = _stripeTransform,
+                Drawing = geometryDrawing
+            };
+
+            _stripe.SetCurrentValue(Shape.FillProperty, stripeBrush);
+        }
+
+        #endregion Feature
+
+        private static Style CreateStyle()
+        {
+            var border = new FrameworkElementFactory(typeof(Border), "Border");
+            border.SetValue(BorderBrushProperty, new TemplateBindingExtension(BorderBrushProperty));
+            border.SetValue(BorderThicknessProperty, new TemplateBindingExtension(BorderThicknessProperty));
+
+            var percentBinding = new MultiBinding
+            {
+                Converter = PercentageConverter.I,
+                StringFormat = "{0:N1} %"
+            };
+            percentBinding.Bindings.Add(new Binding("Minimum") { RelativeSource = RelativeSource.TemplatedParent });
+            percentBinding.Bindings.Add(new Binding("Maximum") { RelativeSource = RelativeSource.TemplatedParent });
+            percentBinding.Bindings.Add(new Binding("Value") { RelativeSource = RelativeSource.TemplatedParent });
+
+            var percentText = new FrameworkElementFactory(typeof(TextBlock), "Percent");
+            percentText.SetBinding(TextBlock.TextProperty, percentBinding);
+            percentText.SetValue(MarginProperty, new Thickness { Right = 20 });
+            percentText.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Right);
+            percentText.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
+            percentText.SetValue(ForegroundProperty, new TemplateBindingExtension(TextBrushProperty));
+
+            var progressLabel = new FrameworkElementFactory(typeof(TextBlock), "Label");
+            progressLabel.SetValue(TextBlock.TextProperty, new TemplateBindingExtension(LabelTextProperty));
+            progressLabel.SetValue(HorizontalAlignmentProperty, HorizontalAlignment.Left);
+            progressLabel.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
+            progressLabel.SetValue(ForegroundProperty, new TemplateBindingExtension(TextBrushProperty));
+            progressLabel.SetValue(MarginProperty, new Thickness { Left = 10.0 });
+
+            var partGlowRect = new FrameworkElementFactory(typeof(Rectangle), GlowingRectTemplateName);
+            partGlowRect.SetValue(VisibilityProperty, Visibility.Collapsed);
+
+            var partIndicator = new FrameworkElementFactory(typeof(Rectangle), IndicatorTemplateName);
+            partIndicator.SetValue(Shape.FillProperty, new TemplateBindingExtension(ForegroundProperty));
+
+            var partTrack = new FrameworkElementFactory(typeof(Rectangle), TrackTemplateName);
+            partTrack.SetValue(Shape.FillProperty, new TemplateBindingExtension(BackgroundProperty));
+
+            var partStripe = new FrameworkElementFactory(typeof(Rectangle), StripeTemplateName);
+            partStripe.SetValue(VisibilityProperty, Visibility.Collapsed);
+
+            var root = new FrameworkElementFactory(typeof(Grid), "TemplateRoot");
+            root.SetValue(MinHeightProperty, 14.0);
+            root.SetValue(MinWidthProperty, 20.0);
+            root.AppendChild(partTrack);
+            root.AppendChild(partStripe);
+            root.AppendChild(partIndicator);
+            root.AppendChild(partGlowRect);
+            root.AppendChild(percentText);
+            root.AppendChild(progressLabel);
+            root.AppendChild(border);
+
+            var isIndeterminate = new Trigger{ Property = ProgressStateProperty, Value = ProgressState.Indeterminate };
+            isIndeterminate.Setters.Add(new Setter(VisibilityProperty, Visibility.Collapsed, "Percent"));
+            isIndeterminate.Setters.Add(new Setter(VisibilityProperty, Visibility.Collapsed, IndicatorTemplateName));
+            isIndeterminate.Setters.Add(new Setter(VisibilityProperty, Visibility.Visible, GlowingRectTemplateName));
+
+            var stripeAnimationTrigger = new MultiTrigger();
+            stripeAnimationTrigger.Conditions.Add(new Condition(ProgressStateProperty, ProgressState.Normal));
+            stripeAnimationTrigger.Conditions.Add(new Condition(EnableStripeAnimationProperty, true));
+            stripeAnimationTrigger.Setters.Add(new Setter(VisibilityProperty, Visibility.Visible, StripeTemplateName));
+
+            var pausedTrigger = new MultiTrigger();
+            pausedTrigger.Conditions.Add(new Condition(ProgressStateProperty, ProgressState.Paused));
+            pausedTrigger.Conditions.Add(new Condition(EnableStripeAnimationProperty, true));
+            pausedTrigger.Setters.Add(new Setter(VisibilityProperty, Visibility.Visible, StripeTemplateName));
+
+            var completedTrigger = new Trigger{ Property = ProgressStateProperty, Value = ProgressState.Completed };
+            completedTrigger.Setters.Add(new Setter(VisibilityProperty, Visibility.Visible, GlowingRectTemplateName));
+            completedTrigger.Setters.Add(new Setter(Shape.FillProperty,
+                new Binding("CompletedBrush") { RelativeSource = RelativeSource.TemplatedParent }, GlowingRectTemplateName));
+
+            var ct = new ControlTemplate(typeof(RangeBase))
+            {
+                VisualTree = root
+            };
+            ct.Triggers.Add(isIndeterminate);
+            ct.Triggers.Add(stripeAnimationTrigger);
+            ct.Triggers.Add(pausedTrigger);
+            ct.Triggers.Add(completedTrigger);
+
+            var style = new Style(typeof(RangeBase));
+            style.Setters.Add(new Setter(TemplateProperty, ct));
+            style.Setters.Add(new Setter(BorderThicknessProperty, new Thickness(1.0)));
+            style.Setters.Add(new Setter(HeightProperty, 20.0));
+            style.Setters.Add(new Setter(SnapsToDevicePixelsProperty, true));
+            return style;
+        }
+
+        public override void OnApplyTemplate()
+        {
+            base.OnApplyTemplate();
+
+            var track = GetTemplateChild(TrackTemplateName);
+            if (track != null)
+                _track = (FrameworkElement)track;
+
+            var glow = GetTemplateChild(GlowingRectTemplateName);
+            if (glow != null)
+                _glow = (FrameworkElement)glow;
+
+            var stripe = GetTemplateChild(StripeTemplateName);
+            if (stripe != null)
+                _stripe = (FrameworkElement)stripe;
+
+            var indicator = GetTemplateChild(IndicatorTemplateName);
+            if (indicator != null)
+            {
+                _indicator = (FrameworkElement)indicator;
+                _indicator.InvalidateProperty(RenderTransformProperty);
+                _indicator.RenderTransform = _indicatorTransform;
+            }
+
+            SetGlowElementBrush();
+            SetStripeElementBrush();
+        }
+
+        protected override void OnMinimumChanged(double oldMinimum, double newMinimum)
+        {
+            base.OnMinimumChanged(oldMinimum, newMinimum);
+            UpdateIndicator();
+        }
+
+        protected override void OnMaximumChanged(double oldMaximum, double newMaximum)
+        {
+            base.OnMaximumChanged(oldMaximum, newMaximum);
+            UpdateIndicator();
+        }
+
+
+        #region DependencyProperties
+
         public double SmoothValue
         {
             get { return (double)GetValue(SmoothValueProperty); }
@@ -1945,65 +2608,9 @@ namespace ProgressWindow
         }
 
         public static readonly DependencyProperty SmoothValueProperty =
-            DependencyProperty.RegisterAttached("SmoothValue", typeof(double), typeof(CustomProgressBar), new PropertyMetadata(0.0, SmoothValue_PropertyChanged));
-
-        private static void SmoothValue_PropertyChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            var source = d as CustomProgressBar;
-            if (source.IsActive) {
-                var anim = new DoubleAnimation((double)e.NewValue, TimeSpan.FromMilliseconds(500));
-                anim.Completed += (s, _) => { source._smoothValueActive = false; };
-                source.BeginAnimation(ProgressBar.ValueProperty, anim, HandoffBehavior.Compose);
-                source._smoothValueActive = true;
-            }
-        }
-
-        public Transform StripeTransform
-        {
-            get { return (Transform)GetValue(StripeTransformProperty); }
-            set { SetValue(StripeTransformProperty, value); }
-        }
-        public static readonly DependencyProperty StripeTransformProperty =
-            DependencyProperty.RegisterAttached("StripeTransform", typeof(Transform), typeof(CustomProgressBar), new PropertyMetadata(new TranslateTransform()));
-
-        private DrawingBrush _stripeBrush;
-        public DrawingBrush StripeBrush
-        {
-            get {
-                if (_stripeBrush == null)
-                    _stripeBrush = CreateStripeBrush();
-                
-                return _stripeBrush;
-            }
-            set { _stripeBrush = value; }
-        }
-
-        private DoubleAnimation _progressBarStripeAnimation = new DoubleAnimation{
-            From = 0.0,
-            To = 40.0,
-            RepeatBehavior = RepeatBehavior.Forever,
-            Duration = new Duration(TimeSpan.FromMilliseconds(500.0))
-        };
-
-        private Storyboard _progressAnimationStoryboard;
-        
-        public bool IsActive
-        {
-            get { return (bool)GetValue(IsActiveProperty); }
-            set { SetValue(IsActiveProperty, value); }
-        }
-        public static readonly DependencyProperty IsActiveProperty =
-            DependencyProperty.Register("IsActive", typeof(bool), typeof(CustomProgressBar),
-                                        new PropertyMetadata(false, new PropertyChangedCallback(ActiveStateChanged)));
-
-        public bool EnableActiveAnimation
-        {
-            get { return (bool)GetValue(EnableActiveAnimationProperty); }
-            set { SetValue(EnableActiveAnimationProperty, value); }
-        }
-        public static readonly DependencyProperty EnableActiveAnimationProperty =
-            DependencyProperty.Register("EnableActiveAnimation", typeof(bool), typeof(CustomProgressBar),
-                                        new PropertyMetadata(true, new PropertyChangedCallback(ActiveStateChanged)));
+            DependencyProperty.Register("SmoothValue",
+                typeof(double), typeof(CustomProgressBar), new PropertyMetadata(
+                    (d, e) => { ((CustomProgressBar)d).AnimateSmoothValue((double)e.NewValue); }));
 
         public string LabelText
         {
@@ -2012,179 +2619,79 @@ namespace ProgressWindow
         }
 
         public static readonly DependencyProperty LabelTextProperty =
-            DependencyProperty.Register("LabelText", typeof(string), typeof(CustomProgressBar),
-                                        new PropertyMetadata(String.Empty));
+            DependencyProperty.Register("LabelText",
+                typeof(string), typeof(CustomProgressBar), new PropertyMetadata(String.Empty));
 
-        public int GridRow
+
+        public ProgressState ProgressState
         {
-            set { Grid.SetRow(this, value); }
+            get { return (ProgressState)GetValue(ProgressStateProperty); }
+            set { SetValue(ProgressStateProperty, value); }
+        }
+        public static readonly DependencyProperty ProgressStateProperty =
+            DependencyProperty.Register("ProgressState",
+                typeof(ProgressState), typeof(CustomProgressBar), new PropertyMetadata(
+                    ProgressState.Indeterminate, new PropertyChangedCallback(ProgressStateChanged)));
+
+        public bool EnableStripeAnimation
+        {
+            get { return (bool)GetValue(EnableStripeAnimationProperty); }
+            set { SetValue(EnableStripeAnimationProperty, value); }
+        }
+        public static readonly DependencyProperty EnableStripeAnimationProperty =
+            DependencyProperty.Register("EnableStripeAnimation",
+                typeof(bool), typeof(CustomProgressBar), new PropertyMetadata(true, new PropertyChangedCallback(ProgressStateChanged)));
+
+        public Brush CompletedBrush
+        {
+            get { return (Brush)GetValue(CompletedBrushProperty); }
+            set { SetValue(CompletedBrushProperty, value); }
+        }
+        public static readonly DependencyProperty CompletedBrushProperty =
+            DependencyProperty.Register("CompletedBrush", typeof(Brush), typeof(CustomProgressBar),
+                                        new PropertyMetadata(new SolidColorBrush(Color.FromArgb(255, 20, 255, 255))));
+
+        public Brush TextBrush
+        {
+            get { return (Brush)GetValue(TextBrushProperty); }
+            set { SetValue(TextBrushProperty, value); }
+        }
+        public static readonly DependencyProperty TextBrushProperty =
+            DependencyProperty.Register("TextBrush", typeof(Brush), typeof(CustomProgressBar),
+                                        new PropertyMetadata(System.Windows.SystemColors.HighlightTextBrush));
+
+        #endregion DependencyProperties
+
+        public bool IsIndeterminate
+        {
+            get { return ProgressState == ProgressState.Indeterminate; }
         }
 
-        public int GridColumn
+        private class PercentageConverter : IMultiValueConverter
         {
-            set { Grid.SetColumn(this, value); }
-        }
-
-        public CustomProgressBar()
-        {
-            _progressAnimationStoryboard = _progressBarStripeAnimation.ToStoryboard(
-                this,
-                new PropertyPath(
-                    "(0).(1)",
-                    CustomProgressBar.StripeTransformProperty,
-                    TranslateTransform.XProperty
-                )
-            );
-
-            Height = 30;
-            Width = 600;
-            Minimum = 0.0;
-            Maximum = 100.0;
-            Margin = new Thickness{ Left = 20, Right = 20 };
-            VerticalAlignment = VerticalAlignment.Center;
-            Template = CreateTemplate();
-
-            BeginProgressAnimation();
-        }
-
-        private static async void ActiveStateChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-        {
-            CustomProgressBar source = (CustomProgressBar)d;
-
-            if (source.IsActive && source.EnableActiveAnimation)
+            public static PercentageConverter I = new PercentageConverter();
+            public object Convert(object[] value, Type type, object parameter, CultureInfo culture)
             {
-                source.ResumeProgressAnimation();
-            } else {
-                for(int l = 50; l > 0; l++) {
-                    if (source._smoothValueActive == false) {
-                        source.PauseProgressAnimation();
-                        break;
-                    } else {
-                        await Task.Delay(100);
-                    }
+                object result;
+                try
+                {
+                    var minimum = (double)value[0];
+                    var maximum = (double)value[1];
+                    var val = (double)value[2];
+                    result = (maximum == minimum) ? 100.0 : 100.0 * (val - minimum) / (maximum - minimum) ;
                 }
+                catch
+                {
+                    result = Binding.DoNothing;
+                }
+                return result;
+            }
+
+            public object[] ConvertBack(object value, Type[] type, object parameter, CultureInfo culture)
+            {
+                throw new NotImplementedException();
             }
         }
-
-        private static ControlTemplate CreateTemplate()
-        {
-            var indicator = new FrameworkElementFactory(typeof(Rectangle), "Indicator");
-            indicator.SetValue(Shape.FillProperty, Theme.progressBarFgBrush);
-
-            var stripe = new FrameworkElementFactory(typeof(Rectangle), "Stripe");
-            stripe.SetBinding(
-                Shape.FillProperty,
-                new Binding("StripeBrush"){ RelativeSource = RelativeSource.TemplatedParent }
-            );
-
-            var partIndicator = new FrameworkElementFactory(typeof(Grid), "PART_Indicator");
-            partIndicator.SetValue(UIElement.RenderTransformOriginProperty, new Point(0, 1));
-            partIndicator.SetValue(UIElement.RenderTransformProperty, new SkewTransform(-45, 0));
-            partIndicator.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
-            partIndicator.SetValue(FrameworkElement.MarginProperty, new Thickness{ Left = -30.0,  Right = 10.0 });
-            partIndicator.AppendChild(indicator);
-            partIndicator.AppendChild(stripe);
-
-            var partTrack = new FrameworkElementFactory(typeof(Border), "PART_Track");
-            partTrack.SetValue(Border.BackgroundProperty, Theme.progressBarBgBrush);
-            partTrack.SetValue(UIElement.ClipToBoundsProperty, true);
-            partTrack.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
-            partTrack.AppendChild(partIndicator);
-
-            var percentageLabel = new FrameworkElementFactory(typeof(Label));
-            percentageLabel.SetBinding(
-                ContentControl.ContentProperty,
-                new Binding("Value"){ RelativeSource = RelativeSource.TemplatedParent }
-            );
-            percentageLabel.SetValue(ContentControl.ContentStringFormatProperty, "{0:N1} %");
-            percentageLabel.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Right);
-            percentageLabel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-            percentageLabel.SetValue(TextBlock.FontStyleProperty, FontStyles.Italic);
-            percentageLabel.SetValue(TextBlock.ForegroundProperty, Theme.foregroundBrush);
-            percentageLabel.SetValue(FrameworkElement.MarginProperty, new Thickness{ Right = 60.0 });
-
-            var progressLabel = new FrameworkElementFactory(typeof(Label));
-            progressLabel.SetBinding(
-                ContentControl.ContentProperty,
-                new Binding("LabelText"){ RelativeSource = RelativeSource.TemplatedParent }
-            );
-            progressLabel.SetValue(Control.FontFamilyProperty, new FontFamily("Yu Gothic UI Semibold"));
-            progressLabel.SetValue(Control.FontSizeProperty, 14.0);
-            progressLabel.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Left);
-            progressLabel.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-            progressLabel.SetValue(TextBlock.ForegroundProperty, Theme.foregroundBrush);
-            progressLabel.SetValue(FrameworkElement.MarginProperty, new Thickness{ Left = 10.0 });
-
-            var root = new FrameworkElementFactory(typeof(Grid), "TemplateRoot");
-            root.AppendChild(partTrack);
-            root.AppendChild(percentageLabel);
-            root.AppendChild(progressLabel);
-
-            var controlTemplate = new ControlTemplate(typeof(ProgressBar)){
-                VisualTree = root
-            };
-
-            var enableAnimationTrigger = new Trigger{
-                Property = CustomProgressBar.EnableActiveAnimationProperty,
-                Value = false,
-            };
-            enableAnimationTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "Stripe"));
-
-            var completedTrigger = new Trigger{
-                Property = RangeBase.ValueProperty,
-                Value = 100.0,
-            };
-            completedTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed, "Stripe"));
-            completedTrigger.Setters.Add(new Setter(Shape.FillProperty, Theme.progressBarCompletedBrush, "Indicator"));
-            controlTemplate.Triggers.Add(enableAnimationTrigger);
-            controlTemplate.Triggers.Add(completedTrigger);
-
-            return controlTemplate;
-        }
-
-        private DrawingBrush CreateStripeBrush()
-        {
-            var stripeBrush = new DrawingBrush{
-                TileMode = TileMode.Tile,
-                Stretch = Stretch.Uniform,
-                Viewport = new Rect(0, 0, 40, 20),
-                ViewportUnits = BrushMappingMode.Absolute,
-                Transform = StripeTransform
-            };
-
-            var geometryDrawing = new GeometryDrawing();
-            geometryDrawing.Geometry = PathGeometry.Parse(
-                "M 0,0 L 10,0 L 10,20 L 0,20 Z M 30,0 L 40,0 L 40,20 L 30,20 Z"
-            );
-            geometryDrawing.Brush = Theme.progressBarStripeBrush;
-            stripeBrush.Drawing = geometryDrawing;
-
-            return stripeBrush;
-        }
-
-        public void BeginProgressAnimation()
-        {
-            _progressAnimationStoryboard.Begin(this, true);
-        }
-
-        public void ResumeProgressAnimation()
-        {
-            _progressAnimationStoryboard.Resume(this);
-        }
-
-        public void PauseProgressAnimation()
-        {
-            _progressAnimationStoryboard.Pause(this);
-        }
-    }
-
-    [Flags]
-    public enum ProgressStatus
-    {
-        Initialize = 1,
-        Processing = 2,
-        Suspend = 4,
-        Completed = 8
     }
 
     [ValueConversion(typeof(Enum), typeof(Boolean))]
@@ -2248,26 +2755,24 @@ namespace ProgressWindow
         }
     }
 
-    [ValueConversion(typeof(ProgressStatus), typeof(TaskbarItemProgressState))]
+    [ValueConversion(typeof(ProgressState), typeof(TaskbarItemProgressState))]
     public class TaskbarItemProgressStateConverter : IValueConverter
     {
         public static TaskbarItemProgressStateConverter I = new TaskbarItemProgressStateConverter();
         public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         {
-            if (value == null || !(value is ProgressStatus))
+            if (value == null || !(value is ProgressState))
                 return Binding.DoNothing;
 
-            switch ((ProgressStatus)value) {
-                case ProgressStatus.Initialize:
+            switch ((ProgressState)value) {
+                case ProgressState.Indeterminate:
                     return TaskbarItemProgressState.Indeterminate;
-                case ProgressStatus.Processing:
+                case ProgressState.Normal:
                     return TaskbarItemProgressState.Normal;
-                case ProgressStatus.Suspend:
+                case ProgressState.Paused:
                     return TaskbarItemProgressState.Paused;
-                case ProgressStatus.Completed:
-                    return TaskbarItemProgressState.None;
                 default :
-                    return Binding.DoNothing;
+                    return TaskbarItemProgressState.None;
             }
         }
 

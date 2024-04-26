@@ -29,7 +29,7 @@ $OUTPUT_EXTENSION = ".mp4"
 
 $FFMPEG_PARAMETERS = @'
 //-hide_banner
--loglevel repeat+level+verbose
+-loglevel repeat+verbose
 -ignore_unknown
 -dn
 -y
@@ -47,21 +47,6 @@ $FFMPEG_PARAMETERS = @'
 
 # TODO  detect "Conversion failed!" "Error"
 
-<# TODO progressbar intermidiate state
-$FFMPEG_PARAMETERS = @'
--hide_banner
-//-loglevel info
--ignore_unknown
--dn
--y
--i [INPUT]
--analyzeduration 30M -probesize 30M
--c:v copy
--c:a copy
-[OUTPUT]
-'@
-#>
-
 $INPUT_PATTERN = "\[INPUT\]"
 $OUTPUT_PATTERN = "\[OUTPUT\]"
 $REGEX_OPT = [Text.RegularExpressions.RegexOptions]::IgnoreCase
@@ -73,7 +58,7 @@ $OPEN_FOLDER_ENCODED = $false
 $PREVENT_SLEEP = $true
 $PREVENT_SLEEP_STATE = [UInt32]0x00000002 # $ES_SYSTEM_REQUIRED = [UInt32]0x00000002 : , $ES_DISPLAY_REQUIRED = [UInt32]0x00000002,
 $SHOW_CONSOLE_PROGRESSBAR = $false
-$ENABLE_ACTIVE_ANIMATION = $false
+$ENABLE_ACTIVE_ANIMATION = $true
 $FFMPEG_FILE = "ffmpeg.exe"
 $FFPROBE_FILE = "ffprobe.exe"
 
@@ -342,11 +327,13 @@ $processControlCommand.ExecuteHandler = {
     param($param)
 
     if ([bool]$param) {
+        $viewModel.BusyMessage = "On pause."
+        $viewModel.Busy = $true
+        $viewModel.ProgressState = [ProgressWindow.ProgressState]::Paused
         $ffmpegProcess.Suspend()
-        $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Suspend
     } else {
+        $viewModel.ProgressState = [ProgressWindow.ProgressState]::Normal
         $ffmpegProcess.Resume()
-        $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Processing
     }
 }
 $viewModel.ProcessControlCommand = $processControlCommand
@@ -358,6 +345,7 @@ $processExitCommand.ExecuteHandler = {
     [ConsoleHelper]::Log("The program is currently shutting down.", 1)
 
     $syncData.termination = $true
+    $viewModel.ProgressState = [ProgressWindow.ProgressState]::None
     $viewModel.BusyMessage = "Shutting down."
     $viewModel.Busy = $true
     $progressWindow.DoEvents()
@@ -366,7 +354,6 @@ $processExitCommand.ExecuteHandler = {
     if ($ffmpegProcess.TryGetProcess([ref]$process)) {
         $streamWriter = $process.StandardInput
         if ($streamWriter -ne $null) {
-            $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Suspend
             $streamWriter.WriteLine("q") # Send q as an input to the ffmpeg process window making it stop.
 
             if ($ffmpegProcess.IsSuspended) {
@@ -442,11 +429,6 @@ $runspaceScript = {
     $ffmpegTask = $ffmpegProcess.Start()
 
     $viewModel.CurrentOperation = $currentOperation
-    
-    if ($StartPaused) {
-        $viewModel.BusyMessage = "On pause."
-        $viewModel.ProcessControlCommand.Execute($true)
-    }
 
     while (-not $ffmpegTask.Wait(500)) {
         foreach ($receivedData in $ffmpegProcess.ReceivedDataQueue.GetConsumingEnumerable())
@@ -518,15 +500,22 @@ $runspaceScript = {
                         $viewModel.ProgressRemaining = [TimeSpan]::FromSeconds($remainingTime)
                         $viewModel.WindowTitle = "$($progressRecord.PercentComplete)% $taskName"
 
-                        # Set [ProgressStatus] according to progress
-                        if((0 -lt $percentComplete) -and ($syncData.termination -eq $false)) {
+                        if ($StartPaused) {
+                            [ConsoleHelper]::Info("The process started in paused state")
+                            $StartPaused = $false
+                            $viewModel.BusyMessage = "On pause."
+                            $viewModel.ProcessControlCommand.Execute($true)
+                        } elseif((0 -lt $percentComplete) -and ($syncData.termination -eq $false)) {
+                            
                             $viewModel.Busy = $false
 
-                            # If progress is 100%, set [ProgressStatus] to Completed.
+                            # If progress is 100%, set [RecordType] to Completed.
                             if (100 -gt $percentComplete) {
-                                $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Processing
+                            
+                                # Set [ProgressState] according to progress
+                                $viewModel.ProgressState = [ProgressWindow.ProgressState]::Normal
                             } else {
-                                $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Completed
+                                #$viewModel.ProgressState = [ProgressWindow.ProgressState]::Completed
 
                                 # and [ProgressRecord.RecordType]
                                 $progressRecord.RecordType = [System.Management.Automation.ProgressRecordType]::Completed
@@ -583,9 +572,8 @@ $runspaceScript = {
 
     if (($syncData.exitCode -eq 0) -and ($syncData.termination -eq $false)) {
         
-        # --- たまに99.9%でプロセスが終亁E��てしまぁE��ぁE��ので対策コーチE※要調査
+        # --- たまに99.9%でプロセスが終了してしまうようなので対策 ※要調査
         $viewModel.Progress = 100.0
-        $viewModel.ProgressStatus = [ProgressWindow.ProgressStatus]::Completed
         # -----------------------------------------------------------------
         
         if ($viewModel.AutoPlay) {
