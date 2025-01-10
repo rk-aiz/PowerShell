@@ -32,7 +32,6 @@ param (
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-
 # 優先順位を変更するプレフィックス対象
 $TARGET_PREFIX = "::ffff:0:0/96"
 
@@ -119,7 +118,7 @@ if ("" -eq $NewPrecedence) {
         $NewPrecedence = Read-Host "プレフィックス[$TARGET_PREFIX]の新しい優先順位を入力してください (例: 100)"
         if ("" -eq $NewPrecedence) {
             Write-Output "入力がキャンセルされました。スクリプトを終了します。"
-            exit
+            exit 1
         }
         if (-not ([int]::TryParse($NewPrecedence, [ref]$null))) {
             Write-Host "優先順位は整数値である必要があります。再入力してください。" -ForegroundColor DarkYellow
@@ -129,14 +128,14 @@ if ("" -eq $NewPrecedence) {
     # パラメータとして受け取った場合も整数チェックを行う
     if (-not ([int]::TryParse($NewPrecedence, [ref]$null))) {
         Write-Host "優先順位は整数値である必要があります。スクリプトを終了します。" -ForegroundColor DarkYellow
-        exit
+        exit 1
     }
 }
 
 # 管理者権限を確認してnetshコマンドを実行
 if (-not (Test-Admin)) {
     Write-Host "管理者権限がありません。管理者権限を取得して実行します。" -ForegroundColor DarkYellow
-    $arguments = "-File `"$($MyInvocation.MyCommand.Path)`" -NewPrecedence $NewPrecedence"
+    $arguments = "-ExecutionPolicy RemoteSigned -File `"$($MyInvocation.MyCommand.Path)`" -NewPrecedence $NewPrecedence"
     Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs
     exit
 } else {
